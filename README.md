@@ -21,11 +21,13 @@ py -m pip install -e .
 py -m pytest -v tests
 ```
 
-## Running the API Server
+## Running the Web Dashboard & API Server
 ```bash
 py -m uvicorn codereviewgraph.api.app:app --host 127.0.0.1 --port 8000
 ```
-Visit `http://127.0.0.1:8000/health` or `http://127.0.0.1:8000/docs`.
+- **Web Dashboard:** Open [http://127.0.0.1:8000](http://127.0.0.1:8000) for the full interactive multi-agent UI.
+- **Swagger API Docs:** Open [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs).
+- **Health Endpoint:** [http://127.0.0.1:8000/health](http://127.0.0.1:8000/health).
 
 ## CLI Usage
 ```bash
