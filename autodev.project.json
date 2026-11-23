@@ -1,0 +1,40 @@
+{
+  "project_name": "codereviewgraph",
+  "version": "0.1.0",
+  "description": "Stateful Multi-Agent Code Auditor & Refactoring Workflow using LangGraph & LangChain",
+  "stack": "python",
+  "runtime": "python>=3.11",
+  "setup_commands": [
+    "py -m pip install -e ."
+  ],
+  "compile_commands": [
+    "py -m compileall -q codereviewgraph tests"
+  ],
+  "test_commands": [
+    "py -m pytest -v tests"
+  ],
+  "build_commands": [
+    "py -m compileall -q codereviewgraph"
+  ],
+  "startup_command": "py -m uvicorn codereviewgraph.api.app:app --host 127.0.0.1 --port 8000",
+  "health_check": {
+    "url": "http://127.0.0.1:8000/health",
+    "expected_status": 200,
+    "expected_body": {
+      "status": "healthy"
+    }
+  },
+  "acceptance_criteria": [
+    "AC-1: Clean syntax compilation across all modules",
+    "AC-2: 100% pass rate in unit and integration test suite",
+    "AC-3: Deterministic multi-agent StateGraph flow and conditional branching",
+    "AC-4: State persistence and checkpoint resumption via SQLite/Memory checkpointer",
+    "AC-5: FastAPI health and audit endpoints operational",
+    "AC-6: Zero secret leaks in git tracking"
+  ],
+  "approval_required_commands": [
+    "git push",
+    "docker",
+    "deploy"
+  ]
+}
