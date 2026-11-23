@@ -1,14 +1,12 @@
 """Persistence and checkpointer management for CodeReviewGraph."""
 from typing import Optional, Dict, Any
-from langgraph.checkpoint.base import BaseCheckpointSaver
-from langgraph.checkpoint.memory import MemorySaver
 
 
 class CheckpointManager:
     """Manages thread-scoped graph execution state and checkpoint inspection."""
 
-    def __init__(self, checkpointer: Optional[BaseCheckpointSaver] = None):
-        self.checkpointer: BaseCheckpointSaver = checkpointer or MemorySaver()
+    def __init__(self, checkpointer: Optional[Any] = None):
+        self.checkpointer = checkpointer
 
     def get_run_state(self, app: Any, thread_id: str) -> Optional[Dict[str, Any]]:
         """Retrieve latest checkpoint state for a specific thread/run."""
@@ -27,6 +25,4 @@ class CheckpointManager:
         return None
 
 
-# Default global checkpointer
-default_checkpointer = MemorySaver()
-checkpoint_manager = CheckpointManager(default_checkpointer)
+checkpoint_manager = CheckpointManager()

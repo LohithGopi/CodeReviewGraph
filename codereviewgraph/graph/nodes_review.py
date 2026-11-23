@@ -41,7 +41,6 @@ def verification_critic_node(state: CodeReviewState) -> CodeReviewState:
             score -= 1
 
     if not ast_summary.get("valid_syntax", True):
-        score -= 50
         has_critical = True
 
     overall_score = max(0, min(100, score))

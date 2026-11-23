@@ -54,3 +54,17 @@ def get_user_profile(user_input):
     report = result["final_report"]
     assert report["critical_count"] >= 1
     assert "AUTOMATED REMEDIATION PATCHES" in report["markdown_report"].upper()
+
+
+def test_workflow_syntax_error_reported():
+    """Verify that syntax errors produce a critical finding and are reported cleanly."""
+    app = create_code_review_graph()
+    broken_code = "def broken_func(: pass"
+    result = app.invoke(
+        {"raw_code": broken_code, "language": "python"},
+        config={"configurable": {"thread_id": "test-syntax-run"}}
+    )
+    assert result["current_stage"] == "REVIEW_COMPLETED"
+    report = result["final_report"]
+    assert report["critical_count"] >= 1
+    assert any("Syntax Error" in f["title"] for f in report["findings"])

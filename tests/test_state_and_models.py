@@ -50,6 +50,20 @@ def test_scan_security_rules_subprocess_shell_true():
     assert any("shell=True" in f["title"] for f in findings)
 
 
+def test_scan_security_rules_multiline_subprocess():
+    code = """
+import subprocess
+subprocess.run(
+    ['ls', '-la'],
+    shell=True
+)
+"""
+    findings = scan_security_rules(code)
+    assert len(findings) >= 1
+    assert any("shell=True" in f["title"] for f in findings)
+    assert findings[0]["line_number"] == 3
+
+
 def test_scan_quality_rules():
     code = "try:\n    do_work()\nexcept:\n    pass\nfrom math import *"
     findings = scan_quality_rules(code)

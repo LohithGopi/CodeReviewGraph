@@ -93,8 +93,8 @@ def main(argv=None):
                 Path(args.output).write_text(report.get("markdown_report", ""), encoding="utf-8")
                 print(f"Markdown report saved to: {args.output}")
 
-            # Non-zero exit code if critical findings exist
-            if report.get("critical_count", 0) > 0:
+            # Non-zero exit code if critical or high findings exist
+            if report.get("critical_count", 0) > 0 or report.get("high_count", 0) > 0:
                 sys.exit(2)
             sys.exit(0)
         except Exception as e:

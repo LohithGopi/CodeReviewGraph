@@ -5,7 +5,7 @@ from langchain_core.messages import BaseMessage, AIMessage
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.outputs import ChatResult, ChatGeneration
 from codereviewgraph.core.config import settings
-from codereviewgraph.core.security_rules import scan_security_rules, scan_quality_rules, analyze_ast
+from codereviewgraph.core.security_rules import scan_security_rules, scan_quality_rules
 
 
 class DeterministicCodeAuditorModel(BaseChatModel):

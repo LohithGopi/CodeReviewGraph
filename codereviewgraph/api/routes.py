@@ -3,6 +3,7 @@ import uuid
 from typing import Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
+from codereviewgraph.core.state import AuditReport
 from codereviewgraph.graph.workflow import review_app
 from codereviewgraph.storage.checkpointer import checkpoint_manager
 
@@ -14,6 +15,13 @@ class AuditRequest(BaseModel):
     language: str = Field(default="python", description="Programming language")
     file_path: Optional[str] = Field(default=None, description="Optional path to target file")
     thread_id: Optional[str] = Field(default=None, description="Run/thread ID for checkpointing")
+
+
+class AuditResponse(BaseModel):
+    thread_id: str
+    status: str
+    report: Optional[AuditReport] = None
+    stage: Optional[str] = None
 
 
 class HealthResponse(BaseModel):
@@ -32,7 +40,7 @@ def health_check():
     )
 
 
-@router.post("/api/audit")
+@router.post("/api/audit", response_model=AuditResponse)
 def audit_code(request: AuditRequest):
     """Execute the multi-agent code review workflow."""
     if not request.code.strip():

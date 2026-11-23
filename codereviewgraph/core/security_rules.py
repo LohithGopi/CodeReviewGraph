@@ -100,23 +100,22 @@ def scan_security_rules(code: str) -> List[Dict[str, Any]]:
     lines = code.splitlines()
 
     for rule in SECURITY_PATTERNS:
-        # Check multiline or single line
-        if rule["pattern"].search(code):
-            # Locate specific lines
-            for i, line in enumerate(lines, 1):
-                if rule["pattern"].search(line):
-                    findings.append({
-                        "id": f"{rule['id']}-{i}",
-                        "category": FindingCategory.SECURITY,
-                        "title": rule["title"],
-                        "severity": rule["severity"],
-                        "line_number": i,
-                        "cwe": rule["cwe"],
-                        "description": rule["description"],
-                        "remediation": rule["remediation"],
-                        "snippet": line.strip(),
-                        "confidence": 0.95
-                    })
+        for match in rule["pattern"].finditer(code):
+            start_pos = match.start()
+            line_no = code[:start_pos].count("\n") + 1
+            snippet = lines[line_no - 1].strip() if 0 < line_no <= len(lines) else match.group(0).strip()
+            findings.append({
+                "id": f"{rule['id']}-{line_no}",
+                "category": FindingCategory.SECURITY,
+                "title": rule["title"],
+                "severity": rule["severity"],
+                "line_number": line_no,
+                "cwe": rule["cwe"],
+                "description": rule["description"],
+                "remediation": rule["remediation"],
+                "snippet": snippet,
+                "confidence": 0.95
+            })
     return findings
 
 
@@ -126,20 +125,22 @@ def scan_quality_rules(code: str) -> List[Dict[str, Any]]:
     lines = code.splitlines()
 
     for rule in QUALITY_PATTERNS:
-        for i, line in enumerate(lines, 1):
-            if rule["pattern"].search(line):
-                findings.append({
-                    "id": f"{rule['id']}-{i}",
-                    "category": FindingCategory.CODE_QUALITY,
-                    "title": rule["title"],
-                    "severity": rule["severity"],
-                    "line_number": i,
-                    "cwe": None,
-                    "description": rule["description"],
-                    "remediation": rule["remediation"],
-                    "snippet": line.strip(),
-                    "confidence": 0.90
-                })
+        for match in rule["pattern"].finditer(code):
+            start_pos = match.start()
+            line_no = code[:start_pos].count("\n") + 1
+            snippet = lines[line_no - 1].strip() if 0 < line_no <= len(lines) else match.group(0).strip()
+            findings.append({
+                "id": f"{rule['id']}-{line_no}",
+                "category": FindingCategory.CODE_QUALITY,
+                "title": rule["title"],
+                "severity": rule["severity"],
+                "line_number": line_no,
+                "cwe": None,
+                "description": rule["description"],
+                "remediation": rule["remediation"],
+                "snippet": snippet,
+                "confidence": 0.90
+            })
     return findings
 
 
