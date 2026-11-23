@@ -1,10 +1,15 @@
 """FastAPI application factory for CodeReviewGraph."""
+from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from codereviewgraph.api.routes import router
 
+STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
+
 app = FastAPI(
-    title="CodeReviewGraph API",
+    title="CodeReviewGraph API & Dashboard",
     description="Stateful Multi-Agent Code Auditor & Refactoring Workflow powered by LangGraph & LangChain",
     version="0.1.0"
 )
@@ -25,3 +30,16 @@ app.add_middleware(
 )
 
 app.include_router(router)
+
+
+@app.get("/", include_in_schema=False)
+def serve_dashboard():
+    """Serve the interactive web frontend dashboard."""
+    index_file = STATIC_DIR / "index.html"
+    if index_file.is_file():
+        return FileResponse(index_file)
+    return {"message": "CodeReviewGraph API is running. Visit /docs for Swagger UI."}
+
+
+if STATIC_DIR.is_dir():
+    app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
