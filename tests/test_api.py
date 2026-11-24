@@ -94,3 +94,10 @@ def test_api_auth_config():
     data = response.json()
     assert "google_client_id" in data
 
+
+def test_google_site_verification():
+    response = client.get("/google280d8fb78c0e8560.html")
+    assert response.status_code == 200
+    assert "google-site-verification: google280d8fb78c0e8560.html" in response.text
+
+

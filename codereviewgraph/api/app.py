@@ -48,6 +48,20 @@ def serve_dashboard():
     return {"message": "CodeReviewGraph API is running. Visit /docs for Swagger UI."}
 
 
+@app.get("/google280d8fb78c0e8560.html", include_in_schema=False)
+@app.get("/google{token}.html", include_in_schema=False)
+def serve_google_verification(token: str = "280d8fb78c0e8560"):
+    """Serve Google site verification file for Search Console & OAuth."""
+    target_file = STATIC_DIR / f"google{token}.html"
+    if target_file.is_file():
+        return FileResponse(target_file, media_type="text/html")
+    default_file = STATIC_DIR / "google280d8fb78c0e8560.html"
+    if default_file.is_file():
+        return FileResponse(default_file, media_type="text/html")
+    return {"detail": "Verification file not found"}
+
+
+
 @app.get("/api", include_in_schema=False)
 def api_overview():
     """API overview endpoint for friendly status discovery."""
