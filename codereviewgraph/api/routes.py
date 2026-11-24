@@ -11,7 +11,7 @@ router = APIRouter()
 
 
 class AuditRequest(BaseModel):
-    code: str = Field(description="Source code string to review")
+    code: str = Field(max_length=200_000, description="Source code string to review")
     language: str = Field(default="python", description="Programming language")
     file_path: Optional[str] = Field(default=None, description="Optional path to target file")
     thread_id: Optional[str] = Field(default=None, description="Run/thread ID for checkpointing")

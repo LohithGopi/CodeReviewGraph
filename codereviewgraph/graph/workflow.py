@@ -2,9 +2,9 @@
 from typing import Optional, Literal
 from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.base import BaseCheckpointSaver
-from langgraph.checkpoint.memory import MemorySaver
 
 from codereviewgraph.core.state import CodeReviewState
+from codereviewgraph.storage.checkpointer import BoundedMemorySaver
 from codereviewgraph.graph.nodes_analysis import (
     planner_node,
     security_auditor_node,
@@ -55,8 +55,8 @@ def create_code_review_graph(checkpointer: Optional[BaseCheckpointSaver] = None)
     builder.add_edge("refactoring_advisor", "report_compiler")
     builder.add_edge("report_compiler", END)
 
-    # Compile graph with optional persistence checkpointer
-    checkpoint_saver = checkpointer if checkpointer is not None else MemorySaver()
+    # Compile graph with bounded in-memory checkpointer to prevent memory leaks
+    checkpoint_saver = checkpointer if checkpointer is not None else BoundedMemorySaver(max_threads=500)
     compiled_app = builder.compile(checkpointer=checkpoint_saver)
     
     return compiled_app

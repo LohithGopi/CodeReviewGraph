@@ -13,7 +13,7 @@ SECURITY_PATTERNS = [
         "severity": FindingSeverity.CRITICAL,
         "cwe": "CWE-89",
         "pattern": re.compile(
-            r"(f[\"'].*?(SELECT|INSERT|UPDATE|DELETE|FROM|WHERE).*?\{|(SELECT|INSERT|UPDATE|DELETE|FROM|WHERE).*?(\%s|\{\}|\.format\(|f[\"'].*?\{))",
+            r"(f[\"']\s*(SELECT|INSERT\s+INTO|UPDATE|DELETE\s+FROM)\b.*?\{|\b(SELECT\s+.*?\s+FROM|INSERT\s+INTO|UPDATE\s+.*?\s+SET|DELETE\s+FROM)\b.*?(\%s|\{\}|\.format\(|f[\"'].*?\{))",
             re.IGNORECASE
         ),
         "description": "SQL statement constructed using dynamic string formatting or interpolation instead of parameterized queries.",
@@ -33,7 +33,7 @@ SECURITY_PATTERNS = [
         "title": "Command Injection via shell=True Subprocess",
         "severity": FindingSeverity.HIGH,
         "cwe": "CWE-78",
-        "pattern": re.compile(r"subprocess\.(Popen|run|call|check_output)\s*\(.*?shell\s*=\s*True", re.DOTALL),
+        "pattern": re.compile(r"subprocess\.(Popen|run|call|check_output)\s*\([^)]*?shell\s*=\s*True", re.DOTALL),
         "description": "Executing subprocess commands with shell=True is susceptible to shell injection attacks.",
         "remediation": "Set shell=False and pass arguments as a list of strings instead of a single interpolated string."
     },

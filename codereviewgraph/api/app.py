@@ -1,4 +1,5 @@
 """FastAPI application factory for CodeReviewGraph."""
+import os
 from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,6 +16,11 @@ app = FastAPI(
 )
 
 # CORS configuration for local development and Vercel deployments
+allowed_origin_regex = os.getenv(
+    "ALLOWED_ORIGIN_REGEX",
+    r"^https://[a-zA-Z0-9_-]+\.vercel\.app$"
+)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -24,7 +30,7 @@ app.add_middleware(
         "http://localhost:5173",
         "http://127.0.0.1:8000",
     ],
-    allow_origin_regex=r"https://.*\.vercel\.app",
+    allow_origin_regex=allowed_origin_regex,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

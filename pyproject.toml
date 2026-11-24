@@ -38,6 +38,3 @@ python_files = ["test_*.py"]
 [tool.fastapi]
 entrypoint = "codereviewgraph.api:app"
 
-[tool.vercel]
-entrypoint = "codereviewgraph.api:app"
-

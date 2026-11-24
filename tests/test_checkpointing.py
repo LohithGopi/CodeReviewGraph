@@ -42,3 +42,21 @@ def test_thread_isolation():
     assert state_b.values["overall_score"] < 100
     assert state_a.values["needs_refactor"] is False
     assert state_b.values["needs_refactor"] is True
+
+
+def test_bounded_memory_saver_eviction():
+    from codereviewgraph.storage.checkpointer import BoundedMemorySaver
+    bounded = BoundedMemorySaver(max_threads=2)
+    app = create_code_review_graph(checkpointer=bounded)
+
+    for i in range(4):
+        app.invoke(
+            {"raw_code": f"x = {i}", "language": "python"},
+            config={"configurable": {"thread_id": f"thread-{i}"}}
+        )
+
+    # Only the last 2 threads should remain in storage
+    remaining_keys = set(bounded.storage.keys())
+    assert remaining_keys == {"thread-2", "thread-3"}
+    assert "thread-0" not in remaining_keys
+    assert "thread-1" not in remaining_keys
