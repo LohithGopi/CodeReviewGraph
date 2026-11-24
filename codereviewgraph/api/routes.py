@@ -31,6 +31,10 @@ class GoogleAuthRequest(BaseModel):
     picture: Optional[str] = None
 
 
+class AuthConfigResponse(BaseModel):
+    google_client_id: str = ""
+
+
 class UserProfile(BaseModel):
     id: str
     email: str
@@ -56,9 +60,40 @@ def health_check():
     )
 
 
+@router.get("/api/auth/config", response_model=AuthConfigResponse)
+def auth_config():
+    """Return public authentication configuration."""
+    import os
+    return AuthConfigResponse(
+        google_client_id=os.environ.get("GOOGLE_CLIENT_ID", "")
+    )
+
+
 @router.post("/api/auth/google", response_model=UserProfile)
 def auth_google(request: GoogleAuthRequest):
-    """Authenticate or verify Google authentication session."""
+    """Authenticate or verify Google authentication session (supports GSI JWT or profile)."""
+    import base64
+    import json
+
+    # If real Google Identity Services JWT credential is provided, decode payload
+    if request.credential:
+        try:
+            parts = request.credential.split(".")
+            if len(parts) >= 2:
+                payload_part = parts[1]
+                payload_part += "=" * ((4 - len(payload_part) % 4) % 4)
+                decoded = json.loads(base64.urlsafe_b64decode(payload_part.encode("utf-8")).decode("utf-8"))
+                return UserProfile(
+                    id=decoded.get("sub", str(uuid.uuid4())[:8]),
+                    email=decoded.get("email", request.email or "developer@gmail.com"),
+                    name=decoded.get("name", request.name or "Developer"),
+                    picture=decoded.get("picture", request.picture or "/static/avatar.png"),
+                    provider="google",
+                    authenticated=True
+                )
+        except Exception:
+            pass
+
     user_id = str(uuid.uuid4())[:8]
     return UserProfile(
         id=user_id,

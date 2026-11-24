@@ -7,6 +7,8 @@
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
   <link rel="alternate icon" type="image/png" href="/static/logo.png">
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Identity Services (GSI) for Google Authenticator -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600&family=JetBrains+Mono:wght@400;500;600&display=swap');
     body { font-family: 'Plus Jakarta Sans', sans-serif; }
@@ -149,6 +151,140 @@
       </div>
     </div>
   </div>
+
+  <!-- Google Account Authenticator & Chooser Dialog -->
+  <div id="google-auth-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4 bg-stone-900/60 backdrop-blur-sm transition-opacity">
+    <div class="bg-white rounded-3xl border border-stone-200/90 shadow-2xl p-6 sm:p-8 max-w-md w-full relative space-y-5 text-center transform transition-transform">
+      
+      <!-- Close Button -->
+      <button onclick="closeGoogleAuthModal()" class="absolute top-4 right-4 w-8 h-8 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-500 flex items-center justify-center text-sm transition">
+        &times;
+      </button>
+
+      <!-- Google Official 4-Color Logo -->
+      <div class="w-12 h-12 mx-auto flex items-center justify-center">
+        <svg class="w-9 h-9" viewBox="0 0 24 24">
+          <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.65v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.14z"/>
+          <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.26v3.15C3.27 21.36 7.34 24 12 24z"/>
+          <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.26C.46 8.16 0 9.94 0 12s.46 3.84 1.26 5.42l4.02-3.15z"/>
+          <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.34 0 3.27 2.64 1.26 6.58l4.02 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
+        </svg>
+      </div>
+
+      <!-- Header -->
+      <div class="space-y-1">
+        <h3 class="text-xl font-bold tracking-tight text-stone-900">Sign in with Google</h3>
+        <p class="text-xs text-stone-500">to continue to <strong class="text-stone-700 font-semibold">CodeReviewGraph</strong></p>
+      </div>
+
+      <!-- Native GSI Slot (rendered when Client ID is configured) -->
+      <div id="gsi-modal-slot" class="flex justify-center empty:hidden"></div>
+
+      <!-- Loading State (hidden by default) -->
+      <div id="google-auth-loading" class="hidden py-8 flex-col items-center justify-center space-y-3">
+        <div class="w-8 h-8 border-3 border-blue-500/20 border-t-blue-600 rounded-full animate-spin"></div>
+        <p class="text-xs text-stone-600 font-medium">Verifying Google Account...</p>
+      </div>
+
+      <!-- Account Chooser Section -->
+      <div id="google-auth-content" class="space-y-3 text-left">
+        
+        <div class="text-[11px] font-semibold text-stone-400 uppercase tracking-wider">Choose an account</div>
+
+        <!-- Account Cards List -->
+        <div class="space-y-2">
+          
+          <!-- Fast Account 1 -->
+          <button type="button" onclick="signInWithGoogleAccount('alex.rivers.dev@gmail.com', 'Alex Rivers')" class="w-full flex items-center justify-between p-3 rounded-2xl border border-stone-200 hover:border-blue-500/60 hover:bg-blue-50/40 text-left transition group">
+            <div class="flex items-center space-x-3">
+              <div class="w-9 h-9 rounded-full bg-[#4285F4] text-white font-semibold flex items-center justify-center text-sm shadow-xs">
+                A
+              </div>
+              <div class="space-y-0.5">
+                <div class="text-xs font-semibold text-stone-900 group-hover:text-blue-700 transition">Alex Rivers</div>
+                <div class="text-[11px] font-mono text-stone-500">alex.rivers.dev@gmail.com</div>
+              </div>
+            </div>
+            <span class="text-stone-400 group-hover:text-blue-600 text-xs transition">&rarr;</span>
+          </button>
+
+          <!-- Fast Account 2 -->
+          <button type="button" onclick="signInWithGoogleAccount('sarah.chen.security@gmail.com', 'Sarah Chen')" class="w-full flex items-center justify-between p-3 rounded-2xl border border-stone-200 hover:border-emerald-500/60 hover:bg-emerald-50/40 text-left transition group">
+            <div class="flex items-center space-x-3">
+              <div class="w-9 h-9 rounded-full bg-[#34A853] text-white font-semibold flex items-center justify-center text-sm shadow-xs">
+                S
+              </div>
+              <div class="space-y-0.5">
+                <div class="text-xs font-semibold text-stone-900 group-hover:text-emerald-700 transition">Sarah Chen</div>
+                <div class="text-[11px] font-mono text-stone-500">sarah.chen.security@gmail.com</div>
+              </div>
+            </div>
+            <span class="text-stone-400 group-hover:text-emerald-600 text-xs transition">&rarr;</span>
+          </button>
+
+        </div>
+
+        <!-- Divider with Toggle for Custom Account -->
+        <div class="pt-1">
+          <button type="button" onclick="toggleCustomGoogleInput()" class="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl border border-dashed border-stone-300 hover:border-stone-400 hover:bg-stone-50 text-xs font-medium text-stone-600 transition">
+            <svg class="w-3.5 h-3.5 text-stone-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/>
+            </svg>
+            <span id="custom-google-toggle-text">Use another Google account</span>
+          </button>
+        </div>
+
+        <!-- Custom Account Entry Form (Collapsible) -->
+        <form id="custom-google-form" onsubmit="handleCustomGoogleSubmit(event)" class="hidden space-y-2.5 pt-2 border-t border-stone-100">
+          <div>
+            <label class="block text-[11px] font-medium text-stone-600 mb-1">Google Email or Gmail</label>
+            <input type="email" id="custom-google-email" required placeholder="your.name@gmail.com" class="w-full px-3.5 py-2.5 rounded-xl border border-stone-300 bg-white text-xs text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#4285F4] focus:border-transparent transition">
+          </div>
+          <div>
+            <label class="block text-[11px] font-medium text-stone-600 mb-1">Display Name (optional)</label>
+            <input type="text" id="custom-google-name" placeholder="e.g. John Doe" class="w-full px-3.5 py-2.5 rounded-xl border border-stone-300 bg-white text-xs text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#4285F4] focus:border-transparent transition">
+          </div>
+          <button type="submit" class="w-full py-2.5 rounded-xl bg-[#1a73e8] hover:bg-[#1557b0] text-white text-xs font-semibold shadow-xs transition active:scale-[0.99] flex items-center justify-center gap-2">
+            <span>Continue as Google User</span>
+            <span>&rarr;</span>
+          </button>
+        </form>
+
+        <!-- Google Cloud OAuth Client ID Drawer (Advanced Setup) -->
+        <div class="pt-2">
+          <details class="text-[11px] text-stone-500 group">
+            <summary class="cursor-pointer hover:text-stone-700 flex items-center justify-between list-none py-1">
+              <span class="flex items-center gap-1.5 font-medium">
+                <svg class="w-3.5 h-3.5 text-stone-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><circle cx="12" cy="12" r="3"/></svg>
+                Google Cloud OAuth 2.0 Client ID (Optional)
+              </span>
+              <span class="group-open:rotate-180 transition-transform">&darr;</span>
+            </summary>
+            <div class="mt-2 space-y-2 p-2.5 rounded-xl bg-stone-50 border border-stone-200">
+              <p class="text-[10px] text-stone-500 leading-relaxed">
+                Connect your Google Cloud OAuth Client ID to trigger Google's native One-Tap popup.
+              </p>
+              <input type="text" id="custom-google-client-id" placeholder="your-client-id.apps.googleusercontent.com" class="w-full px-2.5 py-1.5 rounded-lg border border-stone-300 bg-white text-[11px] font-mono text-stone-900 focus:outline-none focus:ring-1 focus:ring-blue-500">
+              <div class="flex items-center gap-2">
+                <button type="button" onclick="saveGoogleClientId()" class="px-3 py-1 rounded-lg bg-stone-800 hover:bg-stone-900 text-white text-[11px] font-medium transition">
+                  Save &amp; Initialize GSI
+                </button>
+                <button type="button" onclick="clearGoogleClientId()" class="px-2 py-1 text-[11px] text-stone-500 hover:text-rose-600 transition">
+                  Clear
+                </button>
+              </div>
+            </div>
+          </details>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Notification Toast Container -->
+  <div id="toast-container" class="fixed bottom-6 right-6 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
 
   <!-- Hero Section -->
   <section class="relative pt-32 pb-20 px-6 overflow-hidden flex flex-col items-center text-center">
@@ -810,6 +946,43 @@ def ping_host(host_ip):
     // Authentication & State Management
     // ==========================================
     const AUTH_KEY = 'crg_auth_user';
+    const GOOGLE_CLIENT_ID_KEY = 'crg_google_client_id';
+    window.crgServerClientId = '';
+
+    // Generate dynamic Google brand avatar with user initial
+    function generateGoogleAvatar(name, email) {
+      const initial = (name || email || 'G').trim().charAt(0).toUpperCase();
+      const colors = ['#4285F4', '#34A853', '#EA4335', '#FBBC05', '#1a73e8', '#0f9d58'];
+      let hash = 0;
+      const str = (name || email || 'G');
+      for (let i = 0; i < str.length; i++) hash = (hash << 5) - hash + str.charCodeAt(i);
+      const color = colors[Math.abs(hash) % colors.length];
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96"><circle cx="48" cy="48" r="48" fill="${color}"/><text x="50%" y="54%" font-family="Plus Jakarta Sans, sans-serif" font-size="44" font-weight="600" fill="#ffffff" dominant-baseline="middle" text-anchor="middle">${initial}</text></svg>`;
+      return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+    }
+
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toast-container');
+      if (!container) return;
+      const toast = document.createElement('div');
+      const bg = type === 'success' ? 'bg-[#2d3f18] text-[#f7f9f0] border-[#3e5517]' :
+                 type === 'error' ? 'bg-rose-900 text-rose-50 border-rose-700' :
+                 'bg-stone-900 text-stone-100 border-stone-800';
+      toast.className = `pointer-events-auto flex items-center gap-2.5 px-4 py-2.5 rounded-2xl border ${bg} text-xs font-medium shadow-xl transition-all duration-300 transform translate-y-2 opacity-0`;
+      
+      const icon = type === 'success' ? '✓' : type === 'error' ? '✕' : 'ℹ';
+      toast.innerHTML = `<span class="w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold bg-white/20">${icon}</span><span>${message}</span>`;
+      container.appendChild(toast);
+      
+      requestAnimationFrame(() => {
+        toast.classList.remove('translate-y-2', 'opacity-0');
+      });
+      
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-2');
+        setTimeout(() => toast.remove(), 300);
+      }, 3500);
+    }
 
     function getStoredUser() {
       try {
@@ -850,7 +1023,7 @@ def ping_host(host_ip):
           navUserProfile.classList.add('flex');
         }
         if (navUserName) navUserName.innerText = user.name || 'Developer';
-        if (navUserImg) navUserImg.src = user.picture || '/static/avatar.png';
+        if (navUserImg) navUserImg.src = user.picture || generateGoogleAvatar(user.name, user.email);
 
         // Reveal Playground Workstation
         if (playgroundGate) playgroundGate.classList.add('hidden');
@@ -858,7 +1031,7 @@ def ping_host(host_ip):
 
         if (wsUserName) wsUserName.innerText = user.name || 'Developer';
         if (wsUserEmail) wsUserEmail.innerText = user.email || 'developer@gmail.com';
-        if (wsUserImg) wsUserImg.src = user.picture || '/static/avatar.png';
+        if (wsUserImg) wsUserImg.src = user.picture || generateGoogleAvatar(user.name, user.email);
       } else {
         // Logged Out
         if (navLoginBtn) navLoginBtn.classList.remove('hidden');
@@ -883,6 +1056,38 @@ def ping_host(host_ip):
       if (modal) modal.classList.add('hidden');
     }
 
+    function openGoogleAuthModal() {
+      closeLoginModal();
+      const modal = document.getElementById('google-auth-modal');
+      if (modal) modal.classList.remove('hidden');
+    }
+
+    function closeGoogleAuthModal() {
+      const modal = document.getElementById('google-auth-modal');
+      if (modal) modal.classList.add('hidden');
+    }
+
+    function closeAllModals() {
+      closeLoginModal();
+      closeGoogleAuthModal();
+    }
+
+    function toggleCustomGoogleInput() {
+      const form = document.getElementById('custom-google-form');
+      const toggleText = document.getElementById('custom-google-toggle-text');
+      if (form) {
+        const isHidden = form.classList.contains('hidden');
+        if (isHidden) {
+          form.classList.remove('hidden');
+          if (toggleText) toggleText.innerText = "Cancel custom account";
+          document.getElementById('custom-google-email')?.focus();
+        } else {
+          form.classList.add('hidden');
+          if (toggleText) toggleText.innerText = "Use another Google account";
+        }
+      }
+    }
+
     function handleTryDemoClick(event) {
       if (event) event.preventDefault();
       const user = getStoredUser();
@@ -893,47 +1098,186 @@ def ping_host(host_ip):
       }
     }
 
-    async function handleGoogleSignIn() {
-      const modalText = document.getElementById('modal-google-text');
-      const gateText = document.getElementById('gate-google-text');
-      if (modalText) modalText.innerText = "Connecting to Google...";
-      if (gateText) gateText.innerText = "Connecting to Google...";
+    // Google Identity Services (GSI) & Authenticator Trigger
+    function handleGoogleSignIn() {
+      const storedClientId = localStorage.getItem(GOOGLE_CLIENT_ID_KEY) || window.crgServerClientId;
+      if (storedClientId && typeof google !== 'undefined' && google.accounts && google.accounts.id) {
+        try {
+          google.accounts.id.prompt((notification) => {
+            if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+              openGoogleAuthModal();
+            }
+          });
+          return;
+        } catch (e) {
+          console.warn("GSI Prompt fallback:", e);
+        }
+      }
+      openGoogleAuthModal();
+    }
+
+    // Perform Google Sign-In with given profile or account
+    async function signInWithGoogleAccount(email, name, picture) {
+      const loading = document.getElementById('google-auth-loading');
+      const content = document.getElementById('google-auth-content');
+      if (loading) {
+        loading.classList.remove('hidden');
+        loading.classList.add('flex');
+      }
+      if (content) content.classList.add('hidden');
+
+      const avatar = picture || generateGoogleAvatar(name, email);
 
       try {
         const res = await fetch('/api/auth/google', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            name: "Alex Rivers",
-            email: "alex.rivers.dev@gmail.com",
-            picture: "/static/avatar.png"
+            name: name,
+            email: email,
+            picture: avatar
           })
         });
         const profile = await res.json();
         setStoredUser({
-          name: profile.name || "Alex Rivers",
-          email: profile.email || "alex.rivers.dev@gmail.com",
-          picture: profile.picture || "/static/avatar.png",
+          id: profile.id,
+          name: profile.name || name,
+          email: profile.email || email,
+          picture: profile.picture || avatar,
           provider: "google",
           authenticated: true
         });
       } catch (e) {
+        // Offline / network fallback
         setStoredUser({
-          name: "Alex Rivers",
-          email: "alex.rivers.dev@gmail.com",
-          picture: "/static/avatar.png",
+          name: name,
+          email: email,
+          picture: avatar,
           provider: "google",
           authenticated: true
         });
+      } finally {
+        if (loading) {
+          loading.classList.add('hidden');
+          loading.classList.remove('flex');
+        }
+        if (content) content.classList.remove('hidden');
       }
 
-      if (modalText) modalText.innerText = "Continue with Google";
-      if (gateText) gateText.innerText = "Continue with Google";
+      closeAllModals();
+      showToast(`Signed in with Google as ${name}!`, 'success');
 
-      closeLoginModal();
       setTimeout(() => {
-        document.getElementById('playground').scrollIntoView({ behavior: 'smooth' });
-      }, 100);
+        document.getElementById('playground')?.scrollIntoView({ behavior: 'smooth' });
+      }, 150);
+    }
+
+    function handleCustomGoogleSubmit(event) {
+      if (event) event.preventDefault();
+      const emailInput = document.getElementById('custom-google-email');
+      const nameInput = document.getElementById('custom-google-name');
+      const email = emailInput ? emailInput.value.trim() : '';
+      if (!email) return;
+
+      let name = nameInput ? nameInput.value.trim() : '';
+      if (!name) {
+        name = email.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+      }
+
+      signInWithGoogleAccount(email, name);
+    }
+
+    // Handle Native Google Identity Services Credential (JWT)
+    async function handleGoogleGsiResponse(response) {
+      if (!response || !response.credential) return;
+      showToast("Verifying with Google...", "info");
+
+      try {
+        const res = await fetch('/api/auth/google', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ credential: response.credential })
+        });
+        const profile = await res.json();
+        setStoredUser(profile);
+        closeAllModals();
+        showToast(`Signed in with Google as ${profile.name}!`, "success");
+        setTimeout(() => {
+          document.getElementById('playground')?.scrollIntoView({ behavior: 'smooth' });
+        }, 150);
+      } catch (err) {
+        showToast("Google authentication failed. Please try again.", "error");
+      }
+    }
+
+    // Google Cloud OAuth Client ID configuration
+    function setupGoogleGsi(clientId) {
+      if (!clientId) return;
+      if (typeof google !== 'undefined' && google.accounts && google.accounts.id) {
+        try {
+          google.accounts.id.initialize({
+            client_id: clientId,
+            callback: handleGoogleGsiResponse,
+            auto_select: false
+          });
+          const slot = document.getElementById('gsi-modal-slot');
+          if (slot) {
+            slot.innerHTML = '';
+            google.accounts.id.renderButton(slot, {
+              theme: 'outline',
+              size: 'large',
+              text: 'continue_with',
+              shape: 'pill',
+              width: 280
+            });
+          }
+        } catch (e) {
+          console.warn("GSI init warning:", e);
+        }
+      }
+    }
+
+    function saveGoogleClientId() {
+      const input = document.getElementById('custom-google-client-id');
+      const val = input ? input.value.trim() : '';
+      if (val) {
+        localStorage.setItem(GOOGLE_CLIENT_ID_KEY, val);
+        setupGoogleGsi(val);
+        showToast("Google Client ID saved. Initializing 1-Tap...", "success");
+      }
+    }
+
+    function clearGoogleClientId() {
+      localStorage.removeItem(GOOGLE_CLIENT_ID_KEY);
+      const input = document.getElementById('custom-google-client-id');
+      if (input) input.value = '';
+      const slot = document.getElementById('gsi-modal-slot');
+      if (slot) slot.innerHTML = '';
+      showToast("Google Client ID cleared.", "info");
+    }
+
+    async function initGoogleAuth() {
+      const storedId = localStorage.getItem(GOOGLE_CLIENT_ID_KEY);
+      const input = document.getElementById('custom-google-client-id');
+      if (storedId && input) input.value = storedId;
+
+      try {
+        const res = await fetch('/api/auth/config');
+        if (res.ok) {
+          const config = await res.json();
+          if (config.google_client_id) {
+            window.crgServerClientId = config.google_client_id;
+            if (!storedId && input) input.value = config.google_client_id;
+          }
+        }
+      } catch (e) {
+        console.debug("Config endpoint unavailable:", e);
+      }
+
+      const activeId = storedId || window.crgServerClientId;
+      if (activeId) {
+        setupGoogleGsi(activeId);
+      }
     }
 
     function handleEmailSignIn(event, source) {
@@ -941,53 +1285,51 @@ def ping_host(host_ip):
       const input = source === 'modal' ? document.getElementById('modal-email') : document.getElementById('gate-email');
       const email = (input && input.value.trim()) ? input.value.trim() : 'developer@company.com';
       const name = email.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+      const avatar = generateGoogleAvatar(name, email);
 
       setStoredUser({
         name: name || "Developer",
         email: email,
-        picture: "/static/avatar.png",
+        picture: avatar,
         provider: "email",
         authenticated: true
       });
 
-      closeLoginModal();
+      closeAllModals();
+      showToast(`Signed in as ${name}!`, 'success');
+
       setTimeout(() => {
-        document.getElementById('playground').scrollIntoView({ behavior: 'smooth' });
+        document.getElementById('playground')?.scrollIntoView({ behavior: 'smooth' });
       }, 100);
     }
 
     function quickDemoLogin() {
-      setStoredUser({
-        name: "Alex Rivers",
-        email: "alex.rivers.dev@gmail.com",
-        picture: "/static/avatar.png",
-        provider: "google",
-        authenticated: true
-      });
-      closeLoginModal();
-      setTimeout(() => {
-        document.getElementById('playground').scrollIntoView({ behavior: 'smooth' });
-      }, 100);
+      signInWithGoogleAccount("alex.rivers.dev@gmail.com", "Alex Rivers");
     }
 
     function handleSignOut() {
       setStoredUser(null);
-      document.getElementById('playground').scrollIntoView({ behavior: 'smooth' });
+      showToast("Signed out of CodeReviewGraph.", "info");
+      document.getElementById('playground')?.scrollIntoView({ behavior: 'smooth' });
     }
 
     // Modal keyboard accessibility
     window.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') closeLoginModal();
+      if (e.key === 'Escape') closeAllModals();
     });
 
     // Close modal on outside backdrop click
     document.getElementById('login-modal')?.addEventListener('click', (e) => {
       if (e.target.id === 'login-modal') closeLoginModal();
     });
+    document.getElementById('google-auth-modal')?.addEventListener('click', (e) => {
+      if (e.target.id === 'google-auth-modal') closeGoogleAuthModal();
+    });
 
     // Initialize Auth state on page load
     document.addEventListener('DOMContentLoaded', () => {
       updateAuthUI();
+      initGoogleAuth();
     });
     updateAuthUI();
   </script>

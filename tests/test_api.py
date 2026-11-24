@@ -86,3 +86,11 @@ def test_api_auth_me():
     data = response.json()
     assert data["authenticated"] is True
     assert data["provider"] == "google"
+
+
+def test_api_auth_config():
+    response = client.get("/api/auth/config")
+    assert response.status_code == 200
+    data = response.json()
+    assert "google_client_id" in data
+
