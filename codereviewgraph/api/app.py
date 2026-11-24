@@ -3,7 +3,7 @@ import os
 from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from codereviewgraph.api.routes import router
 
@@ -67,16 +67,25 @@ def serve_playground():
 
 
 @app.get("/google280d8fb78c0e8560.html", include_in_schema=False)
+@app.get("/google280d8fb78c0e8560.html/", include_in_schema=False)
+def serve_google_verification():
+    """Serve Google site verification file directly with 200 OK and zero redirects."""
+    return Response(
+        content="google-site-verification: google280d8fb78c0e8560.html",
+        media_type="text/html",
+        status_code=200
+    )
+
+
 @app.get("/google{token}.html", include_in_schema=False)
-def serve_google_verification(token: str = "280d8fb78c0e8560"):
-    """Serve Google site verification file for Search Console & OAuth."""
-    target_file = STATIC_DIR / f"google{token}.html"
-    if target_file.is_file():
-        return FileResponse(target_file, media_type="text/html")
-    default_file = STATIC_DIR / "google280d8fb78c0e8560.html"
-    if default_file.is_file():
-        return FileResponse(default_file, media_type="text/html")
-    return {"detail": "Verification file not found"}
+def serve_generic_google_verification(token: str):
+    """Serve generic Google site verification token with 200 OK."""
+    return Response(
+        content=f"google-site-verification: google{token}.html",
+        media_type="text/html",
+        status_code=200
+    )
+
 
 
 
