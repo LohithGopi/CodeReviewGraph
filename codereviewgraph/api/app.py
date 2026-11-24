@@ -48,6 +48,24 @@ def serve_dashboard():
     return {"message": "CodeReviewGraph API is running. Visit /docs for Swagger UI."}
 
 
+@app.get("/login", include_in_schema=False)
+def serve_login():
+    """Serve the dedicated login authentication page."""
+    login_file = STATIC_DIR / "login.html"
+    if login_file.is_file():
+        return FileResponse(login_file)
+    return FileResponse(STATIC_DIR / "index.html")
+
+
+@app.get("/playground", include_in_schema=False)
+def serve_playground():
+    """Serve the dedicated live code playground workstation."""
+    playground_file = STATIC_DIR / "playground.html"
+    if playground_file.is_file():
+        return FileResponse(playground_file)
+    return FileResponse(STATIC_DIR / "index.html")
+
+
 @app.get("/google280d8fb78c0e8560.html", include_in_schema=False)
 @app.get("/google{token}.html", include_in_schema=False)
 def serve_google_verification(token: str = "280d8fb78c0e8560"):

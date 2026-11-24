@@ -101,3 +101,18 @@ def test_google_site_verification():
     assert "google-site-verification: google280d8fb78c0e8560.html" in response.text
 
 
+def test_login_page_route():
+    response = client.get("/login")
+    assert response.status_code == 200
+    assert "Sign in to CodeReviewGraph" in response.text
+    assert "Continue with Google" in response.text
+
+
+def test_playground_page_route():
+    response = client.get("/playground")
+    assert response.status_code == 200
+    assert "Live Code Playground" in response.text
+    assert "Audit Code via LangGraph" in response.text
+
+
+
