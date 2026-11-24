@@ -113,12 +113,25 @@ class UserDatabase:
                 );
             """)
 
+            # OTP verification table for email + OTP sign in
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS otps (
+                    email TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    code TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    expires_at TEXT NOT NULL,
+                    attempts INTEGER DEFAULT 0
+                );
+            """)
+
             # Indices
             conn.execute("CREATE INDEX IF NOT EXISTS idx_users_google_id ON users(google_id);")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at);")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_oauth_states_expires_at ON oauth_states(expires_at);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_otps_expires_at ON otps(expires_at);")
 
     # --------------------------------------------------------------------------
     # User Management
@@ -314,6 +327,101 @@ class UserDatabase:
         with self._get_connection() as conn:
             conn.execute("DELETE FROM sessions WHERE expires_at <= ?", (now_iso,))
             conn.execute("DELETE FROM oauth_states WHERE expires_at <= ?", (now_iso,))
+            conn.execute("DELETE FROM otps WHERE expires_at <= ?", (now_iso,))
+
+    # --------------------------------------------------------------------------
+    # Email + OTP Verification Management
+    # --------------------------------------------------------------------------
+
+    def store_otp(self, email: str, name: str, code: str, expires_in_seconds: int = 600) -> None:
+        """Store or replace an active OTP for an email address."""
+        clean_email = email.strip().lower()
+        clean_name = name.strip() or clean_email.split("@")[0].title()
+        now = datetime.datetime.now(datetime.timezone.utc)
+        expires_at = (now + datetime.timedelta(seconds=expires_in_seconds)).isoformat()
+
+        with self._get_connection() as conn:
+            conn.execute("""
+                INSERT INTO otps (email, name, code, created_at, expires_at, attempts)
+                VALUES (?, ?, ?, ?, ?, 0)
+                ON CONFLICT(email) DO UPDATE SET
+                    name = excluded.name,
+                    code = excluded.code,
+                    created_at = excluded.created_at,
+                    expires_at = excluded.expires_at,
+                    attempts = 0;
+            """, (clean_email, clean_name, code.strip(), now.isoformat(), expires_at))
+
+    def verify_otp(self, email: str, code: str) -> Dict[str, Any]:
+        """
+        Validate an entered OTP code against the database.
+        
+        Enforces:
+        - Expiration window (10 minutes).
+        - Maximum 5 attempts before invalidating to protect against brute-force attacks.
+        - Deletes valid code on success (single-use consumption).
+        """
+        clean_email = email.strip().lower()
+        clean_code = code.strip()
+        now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+
+        with self._get_connection() as conn:
+            cur = conn.execute("SELECT * FROM otps WHERE email = ?", (clean_email,))
+            row = cur.fetchone()
+            if not row:
+                raise ValueError("No active verification code found for this email. Please request a new code.")
+
+            # Check expiration
+            if row["expires_at"] <= now_iso:
+                conn.execute("DELETE FROM otps WHERE email = ?", (clean_email,))
+                raise ValueError("Verification code has expired. Please request a new code.")
+
+            # Check max attempts (rate limiting)
+            if row["attempts"] >= 5:
+                conn.execute("DELETE FROM otps WHERE email = ?", (clean_email,))
+                raise ValueError("Too many failed attempts. This code has been invalidated for security. Please request a new code.")
+
+            # Validate code match
+            if row["code"] != clean_code:
+                conn.execute("UPDATE otps SET attempts = attempts + 1 WHERE email = ?", (clean_email,))
+                attempts_left = 4 - row["attempts"]
+                if attempts_left > 0:
+                    raise ValueError(f"Incorrect verification code. {attempts_left} attempts remaining.")
+                else:
+                    conn.execute("DELETE FROM otps WHERE email = ?", (clean_email,))
+                    raise ValueError("Too many failed attempts. Please request a new code.")
+
+            # Success - consume single-use OTP
+            conn.execute("DELETE FROM otps WHERE email = ?", (clean_email,))
+            return {"email": clean_email, "name": row["name"]}
+
+    def create_or_update_email_user(self, email: str, name: str) -> Dict[str, Any]:
+        """Register or update an authenticated user verified via Email OTP."""
+        clean_email = email.strip().lower()
+        clean_name = name.strip() or clean_email.split("@")[0].title()
+        now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+
+        with self._get_connection() as conn:
+            cur = conn.execute("SELECT * FROM users WHERE LOWER(email) = ?", (clean_email,))
+            existing = cur.fetchone()
+            if existing:
+                conn.execute("""
+                    UPDATE users 
+                    SET name = COALESCE(NULLIF(?, ''), name), last_login_at = ?
+                    WHERE id = ?
+                """, (clean_name, now_iso, existing["id"]))
+                cur = conn.execute("SELECT * FROM users WHERE id = ?", (existing["id"],))
+                return dict(cur.fetchone())
+
+            # Create new user record
+            new_id = f"usr_{secrets.token_hex(8)}"
+            conn.execute("""
+                INSERT INTO users (id, google_id, email, name, picture, provider, created_at, last_login_at)
+                VALUES (?, NULL, ?, ?, NULL, 'email', ?, ?)
+            """, (new_id, clean_email, clean_name, now_iso, now_iso))
+
+            cur = conn.execute("SELECT * FROM users WHERE id = ?", (new_id,))
+            return dict(cur.fetchone())
 
 
 # Global default instance

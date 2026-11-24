@@ -29,6 +29,7 @@ def clean_test_db():
     with user_db._get_connection() as conn:
         conn.execute("DELETE FROM sessions;")
         conn.execute("DELETE FROM oauth_states;")
+        conn.execute("DELETE FROM otps;")
         conn.execute("DELETE FROM users;")
     yield
 
@@ -236,3 +237,56 @@ def test_auth_config_endpoint():
     data = response.json()
     assert "google_client_id" in data
     assert "configured" in data
+
+
+def test_otp_send_and_verify_flow():
+    """Scenario 13: Send OTP to email and verify code to establish authenticated session."""
+    send_res = client.post("/api/auth/otp/send", json={
+        "email": "developer.otp@company.com",
+        "name": "OTP Developer"
+    })
+    assert send_res.status_code == 200
+    data = send_res.json()
+    assert data["status"] == "sent"
+    assert "developer.otp@company.com" in data["message"]
+
+    # Verify invalid code is rejected
+    fail_res = client.post("/api/auth/otp/verify", json={
+        "email": "developer.otp@company.com",
+        "code": "000000"
+    })
+    assert fail_res.status_code == 400
+    assert "Incorrect" in fail_res.json()["detail"] or "Invalid" in fail_res.json()["detail"]
+
+    # Fetch valid code from db
+    with user_db._get_connection() as conn:
+        row = conn.execute("SELECT code FROM otps WHERE email = ?", ("developer.otp@company.com",)).fetchone()
+        real_code = row["code"]
+
+    # Verify with correct code
+    verify_res = client.post("/api/auth/otp/verify", json={
+        "email": "developer.otp@company.com",
+        "code": real_code
+    })
+    assert verify_res.status_code == 200
+    user_data = verify_res.json()
+    assert user_data["email"] == "developer.otp@company.com"
+    assert user_data["name"] == "OTP Developer"
+    assert user_data["provider"] == "email"
+    assert user_data["authenticated"] is True
+    assert SESSION_COOKIE_NAME in verify_res.cookies
+
+    # Verify session works on /api/auth/me
+    session_cookie = verify_res.cookies[SESSION_COOKIE_NAME]
+    client.cookies.set(SESSION_COOKIE_NAME, session_cookie)
+    me_res = client.get("/api/auth/me")
+    assert me_res.status_code == 200
+    assert me_res.json()["email"] == "developer.otp@company.com"
+    client.cookies.clear()
+
+
+def test_otp_invalid_email():
+    """Scenario 14: Invalid email format is rejected."""
+    res = client.post("/api/auth/otp/send", json={"email": "invalid-format"})
+    assert res.status_code == 400
+    assert "valid email" in res.json()["detail"].lower()

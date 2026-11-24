@@ -24,6 +24,7 @@ from codereviewgraph.api.auth import (
     clear_session_cookie,
     get_current_user,
     get_optional_user,
+    send_otp_email,
 )
 
 router = APIRouter()
@@ -51,6 +52,23 @@ class GoogleAuthRequest(BaseModel):
     credential: Optional[str] = Field(default=None, description="Google Identity Services (GSI) ID token JWT")
     code: Optional[str] = Field(default=None, description="OAuth 2.0 authorization code")
     redirect_uri: Optional[str] = Field(default=None, description="Redirect URI used during authorization code flow")
+
+
+class SendOtpRequest(BaseModel):
+    email: str = Field(description="User email address")
+    name: Optional[str] = Field(default="", description="User display name")
+
+
+class SendOtpResponse(BaseModel):
+    status: str
+    message: str
+    email: str
+    dev_code: Optional[str] = None
+
+
+class VerifyOtpRequest(BaseModel):
+    email: str = Field(description="User email address")
+    code: str = Field(description="6-digit verification code")
 
 
 class AuthConfigResponse(BaseModel):
@@ -260,6 +278,76 @@ def auth_logout(request: Request, response: Response):
         user_db.delete_session(token)
     clear_session_cookie(response, request)
     return {"status": "logged_out", "authenticated": False}
+
+
+# ------------------------------------------------------------------------------
+# Email + OTP Authentication Endpoints
+# ------------------------------------------------------------------------------
+
+@router.post("/api/auth/otp/send", response_model=SendOtpResponse)
+def auth_otp_send(request: SendOtpRequest):
+    """Generate and dispatch a 6-digit one-time passcode to the user's email."""
+    import os
+    import secrets
+    import re
+
+    email = request.email.strip().lower()
+    if not email or not re.match(r"^[^@]+@[^@]+\.[^@]+$", email):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Please provide a valid email address."
+        )
+
+    name = request.name.strip() if request.name else email.split("@")[0].title()
+    code = "".join(secrets.choice("0123456789") for _ in range(6))
+
+    user_db.store_otp(email=email, name=name, code=code, expires_in_seconds=600)
+    send_otp_email(to_email=email, name=name, code=code)
+
+    is_dev = os.getenv("ENVIRONMENT", "").lower() != "production"
+    return SendOtpResponse(
+        status="sent",
+        message=f"Verification code sent to {email}",
+        email=email,
+        dev_code=code if is_dev else None
+    )
+
+
+@router.post("/api/auth/otp/verify", response_model=UserProfile)
+def auth_otp_verify(request: VerifyOtpRequest, req: Request, response: Response):
+    """Verify one-time passcode and establish an authenticated session."""
+    email = request.email.strip().lower()
+    code = request.code.strip()
+
+    if not email or not code:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email and 6-digit verification code are required."
+        )
+
+    try:
+        verified = user_db.verify_otp(email=email, code=code)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Verification failed: {str(e)}")
+
+    user = user_db.create_or_update_email_user(email=verified["email"], name=verified["name"])
+    session_id = user_db.create_session(
+        user_id=user["id"],
+        user_agent=req.headers.get("user-agent"),
+        ip_address=req.client.host if req.client else None
+    )
+    set_session_cookie(response, session_id, req)
+
+    return UserProfile(
+        id=user["id"],
+        email=user["email"],
+        name=user["name"],
+        picture=user.get("picture"),
+        provider="email",
+        authenticated=True
+    )
 
 
 # ------------------------------------------------------------------------------

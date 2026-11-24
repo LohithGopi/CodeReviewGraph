@@ -254,3 +254,57 @@ def get_optional_user(request: Request) -> Optional[Dict[str, Any]]:
     if not token:
         return None
     return user_db.get_session_user(token)
+
+
+# ------------------------------------------------------------------------------
+# Email + OTP Delivery Service
+# ------------------------------------------------------------------------------
+
+def send_otp_email(to_email: str, name: str, code: str) -> bool:
+    """
+    Deliver one-time passcode via SMTP if configured, or log to server console.
+    """
+    import smtplib
+    from email.mime.text import MIMEText
+
+    smtp_host = os.getenv("SMTP_HOST")
+    smtp_port = int(os.getenv("SMTP_PORT", "587"))
+    smtp_user = os.getenv("SMTP_USER")
+    smtp_pass = os.getenv("SMTP_PASSWORD")
+    sender = os.getenv("SMTP_FROM", "noreply@codereviewgraph.dev")
+
+    subject = f"Your CodeReviewGraph Verification Code: {code}"
+    body = f"""Hello {name},
+
+Your one-time login verification code for CodeReviewGraph is:
+
+    {code}
+
+This code will expire in 10 minutes. Enter this code on the login page to securely access your account.
+
+If you did not request this verification code, please ignore this email.
+
+Best regards,
+CodeReviewGraph Team
+"""
+
+    if smtp_host and smtp_user and smtp_pass:
+        try:
+            msg = MIMEText(body)
+            msg["Subject"] = subject
+            msg["From"] = sender
+            msg["To"] = to_email
+
+            with smtplib.SMTP(smtp_host, smtp_port, timeout=10.0) as server:
+                server.starttls()
+                server.login(smtp_user, smtp_pass)
+                server.sendmail(sender, [to_email], msg.as_string())
+            return True
+        except Exception as e:
+            print(f"[Warning] SMTP email delivery failed: {e}")
+            return False
+
+    # Standard fallback for development/demo: log code to standard output
+    print(f"\n[CodeReviewGraph Auth] ✉️ OTP sent to {to_email} ({name}): {code}\n")
+    return True
+
