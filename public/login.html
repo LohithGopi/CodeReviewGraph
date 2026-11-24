@@ -164,8 +164,9 @@
 
   <script>
     const GOOGLE_CLIENT_ID_KEY = 'crg_google_client_id';
+    const DEFAULT_CLIENT_ID = '985395568511-65nv6sl44qvkpcj7aac5ji33he8ms1jl.apps.googleusercontent.com';
     let isAuthenticating = false;
-    let activeClientId = '';
+    let activeClientId = DEFAULT_CLIENT_ID;
 
     // Check if user already has an active authenticated session
     (async function checkExistingSession() {
@@ -465,7 +466,8 @@
         }
       } catch (e) {}
 
-      const effectiveId = storedClientId || serverClientId;
+      const effectiveId = storedClientId || serverClientId || DEFAULT_CLIENT_ID;
+      if (input && !input.value) input.value = effectiveId;
       if (effectiveId) {
         setupGoogleGsi(effectiveId);
       }

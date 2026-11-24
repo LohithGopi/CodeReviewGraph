@@ -1,6 +1,37 @@
 """Core configuration module for CodeReviewGraph."""
-from pydantic import BaseModel, Field
+from __future__ import annotations
+
 import os
+from pathlib import Path
+from pydantic import BaseModel, Field
+
+
+def _load_env_file() -> None:
+    """Load key-value pairs from .env file into os.environ if not already present."""
+    candidates = [
+        Path.cwd() / ".env",
+        Path(__file__).resolve().parent.parent.parent / ".env",
+    ]
+    for env_path in candidates:
+        if env_path.is_file():
+            try:
+                with open(env_path, "r", encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip()
+                        if line and not line.startswith("#") and "=" in line:
+                            k, v = line.split("=", 1)
+                            k = k.strip()
+                            v = v.strip().strip("'\"")
+                            if k and k not in os.environ:
+                                os.environ[k] = v
+                break
+            except Exception:
+                pass
+
+
+_load_env_file()
+
+DEFAULT_GOOGLE_CLIENT_ID = "985395568511-65nv6sl44qvkpcj7aac5ji33he8ms1jl.apps.googleusercontent.com"
 
 
 class Settings(BaseModel):
@@ -13,7 +44,7 @@ class Settings(BaseModel):
     temperature: float = 0.0
 
     # Google OAuth 2.0 & Session Security Settings
-    google_client_id: str = Field(default_factory=lambda: os.getenv("GOOGLE_CLIENT_ID", ""))
+    google_client_id: str = Field(default_factory=lambda: os.getenv("GOOGLE_CLIENT_ID", DEFAULT_GOOGLE_CLIENT_ID))
     google_client_secret: str = Field(default_factory=lambda: os.getenv("GOOGLE_CLIENT_SECRET", ""))
     google_callback_url: str = Field(default_factory=lambda: os.getenv("GOOGLE_CALLBACK_URL", ""))
     session_secret: str = Field(default_factory=lambda: os.getenv("SESSION_SECRET", ""))
