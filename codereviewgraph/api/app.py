@@ -48,5 +48,20 @@ def serve_dashboard():
     return {"message": "CodeReviewGraph API is running. Visit /docs for Swagger UI."}
 
 
+@app.get("/api", include_in_schema=False)
+def api_overview():
+    """API overview endpoint for friendly status discovery."""
+    return {
+        "service": "codereviewgraph",
+        "status": "healthy",
+        "docs_url": "/docs",
+        "health_url": "/health",
+        "endpoints": {
+            "audit": "POST /api/audit",
+            "runs": "GET /api/runs/{thread_id}"
+        }
+    }
+
+
 if STATIC_DIR.is_dir():
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
