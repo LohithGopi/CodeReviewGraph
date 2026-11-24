@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CodeReviewGraph — Multi-Agent Code Review & Governance</title>
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+  <link rel="alternate icon" type="image/png" href="/static/logo.png">
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600&family=JetBrains+Mono:wght@400;500;600&display=swap');
@@ -46,12 +48,7 @@
       
       <!-- Brand -->
       <a href="#" class="flex items-center space-x-2.5 group">
-        <div class="w-7 h-7 rounded-full bg-[#2d3f18] text-[#a8c242] flex items-center justify-center font-bold text-xs shadow-inner">
-          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25">
-            <polyline points="16 18 22 12 16 6"></polyline>
-            <polyline points="8 6 2 12 8 18"></polyline>
-          </svg>
-        </div>
+        <img src="/static/logo.svg" onerror="this.src='/static/logo.png'" alt="CodeReviewGraph Logo" class="w-7 h-7 rounded-lg object-contain shadow-xs group-hover:scale-105 transition-transform">
         <span class="text-sm font-semibold tracking-tight text-[#1c1d1a] group-hover:text-[#2d3f18] transition-colors">codereviewgraph</span>
       </a>
 
@@ -417,9 +414,12 @@
   <!-- Full-Width Chartreuse / Olive Footer (Agentix Aesthetic) -->
   <footer class="mt-20 bg-[#a8c242] text-[#1e2b10] px-6 py-14">
     <div class="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6 border-b border-[#2d3f18]/15 pb-10">
-      <div class="space-y-1 text-center md:text-left">
-        <h3 class="text-2xl font-bold tracking-tight text-[#1e2b10]">CodeReviewGraph</h3>
-        <p class="text-xs font-medium text-[#2d3f18]/80">Autonomous code governance for engineering teams.</p>
+      <div class="flex items-center space-x-3 text-center md:text-left">
+        <img src="/static/logo.svg" onerror="this.src='/static/logo.png'" alt="CodeReviewGraph" class="w-10 h-10 rounded-xl shadow-xs">
+        <div>
+          <h3 class="text-2xl font-bold tracking-tight text-[#1e2b10]">CodeReviewGraph</h3>
+          <p class="text-xs font-medium text-[#2d3f18]/80">Autonomous code governance for engineering teams.</p>
+        </div>
       </div>
       <div class="flex items-center space-x-4">
         <span class="font-mono text-xs bg-[#2d3f18]/10 px-3 py-1.5 rounded-full border border-[#2d3f18]/20">
