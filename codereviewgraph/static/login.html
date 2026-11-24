@@ -50,7 +50,7 @@
       </div>
 
       <!-- Interactive Error / Status Banner -->
-      <div id="auth-alert-banner" class="hidden text-left p-3.5 rounded-2xl border text-xs transition-all space-y-1">
+      <div id="auth-alert-banner" class="hidden text-left p-3.5 rounded-2xl border text-xs transition-all space-y-2">
         <div class="flex items-start justify-between gap-2">
           <div class="flex items-center gap-2 font-semibold" id="auth-alert-title">
             <span id="auth-alert-icon">⚠️</span>
@@ -61,12 +61,16 @@
         <p id="auth-alert-body" class="text-[11px] leading-relaxed text-stone-600 pl-5">
           Notice details.
         </p>
+        <div id="auth-alert-action-container" class="hidden pl-5 pt-1"></div>
       </div>
 
       <!-- Authenticator Card Content -->
       <div class="space-y-4 text-left">
         
-        <!-- Continue with Google Button -->
+        <!-- Primary Official Google Identity Services Render Target -->
+        <div id="gsi-slot-container" class="flex justify-center min-h-[46px] w-full"></div>
+
+        <!-- Fallback Continue with Google Button (used while GSI is loading or if iframe fails) -->
         <button id="google-signin-btn" type="button" onclick="initiateGoogleSignIn()" class="w-full flex items-center justify-center gap-3 px-4 py-3 rounded-xl border border-stone-300 hover:border-stone-400 bg-white hover:bg-stone-50 text-stone-700 text-xs sm:text-sm font-semibold shadow-xs hover:shadow-md transition active:scale-[0.99] group disabled:opacity-60 disabled:cursor-not-allowed">
           <!-- Google 4-color SVG icon -->
           <svg id="google-icon-svg" class="w-5 h-5 shrink-0" viewBox="0 0 24 24">
@@ -83,14 +87,11 @@
           <span id="google-btn-text">Continue with Google</span>
         </button>
 
-        <!-- Official Google Identity Services Render Target -->
-        <div id="gsi-slot-container" class="flex justify-center min-h-[44px] empty:hidden"></div>
-
         <!-- Alternate OAuth Redirect Flow Link -->
         <div class="pt-2 text-center text-[11px] text-stone-500">
-          <span>Having trouble with the popup? </span>
+          <span>Need full-page OAuth redirect? </span>
           <button type="button" onclick="startRedirectOAuthFlow()" class="text-[#3e5517] font-semibold underline underline-offset-2 hover:text-[#2d3f18]">
-            Sign in via Full Page Redirect &rarr;
+            Sign in via Redirect &rarr;
           </button>
         </div>
 
@@ -141,9 +142,24 @@
                   Reset
                 </button>
               </div>
-              <div class="text-[10px] text-stone-500 pt-1 space-y-1 border-t border-stone-200/80">
-                <p><strong>Authorized JavaScript origins:</strong> <code class="font-mono text-stone-700" id="current-origin-label">...</code></p>
-                <p><strong>Authorized redirect URI:</strong> <code class="font-mono text-stone-700" id="current-redirect-label">...</code></p>
+
+              <!-- Quick Copy Links for Google Cloud Console -->
+              <div class="text-[10px] text-stone-600 pt-2 space-y-2 border-t border-stone-200">
+                <p class="font-semibold text-stone-700">Google Cloud Console Settings for this site:</p>
+                <div>
+                  <div class="flex items-center justify-between mb-0.5">
+                    <span class="text-stone-500">Authorized JavaScript origin:</span>
+                    <button type="button" onclick="copyOriginToClipboard()" class="text-blue-600 hover:text-blue-800 font-semibold underline text-[10px]">Copy</button>
+                  </div>
+                  <code id="current-origin-label" class="block p-1.5 bg-white border border-stone-200 rounded font-mono text-[10px] text-stone-800 break-all select-all">...</code>
+                </div>
+                <div>
+                  <div class="flex items-center justify-between mb-0.5">
+                    <span class="text-stone-500">Authorized redirect URI:</span>
+                    <button type="button" onclick="copyRedirectToClipboard()" class="text-blue-600 hover:text-blue-800 font-semibold underline text-[10px]">Copy</button>
+                  </div>
+                  <code id="current-redirect-label" class="block p-1.5 bg-white border border-stone-200 rounded font-mono text-[10px] text-stone-800 break-all select-all">...</code>
+                </div>
               </div>
             </div>
           </details>
@@ -225,11 +241,27 @@
       const banner = document.getElementById('auth-alert-banner');
       if (!banner) return;
       banner.className = type === 'error' 
-        ? "text-left p-3.5 rounded-2xl border bg-rose-50 border-rose-200 text-xs text-rose-900 space-y-1 block"
-        : "text-left p-3.5 rounded-2xl border bg-amber-50 border-amber-200 text-xs text-amber-900 space-y-1 block";
+        ? "text-left p-3.5 rounded-2xl border bg-rose-50 border-rose-200 text-xs text-rose-900 space-y-2 block"
+        : "text-left p-3.5 rounded-2xl border bg-amber-50 border-amber-200 text-xs text-amber-900 space-y-2 block";
       document.getElementById('auth-alert-icon').innerText = type === 'error' ? '✕' : '⚠️';
       document.getElementById('auth-alert-heading').innerText = heading;
       document.getElementById('auth-alert-body').innerText = body;
+
+      const actionContainer = document.getElementById('auth-alert-action-container');
+      if (heading.includes('OAuth') || body.includes('redirect_uri') || body.includes('policy')) {
+        const currentUri = window.location.origin + '/api/auth/google/callback';
+        actionContainer.innerHTML = `
+          <div class="p-2 bg-white rounded border border-rose-200 text-[10px] font-mono break-all text-stone-800">
+            <strong>Required redirect URI:</strong><br>${currentUri}
+          </div>
+          <button type="button" onclick="navigator.clipboard.writeText('${currentUri}'); showToast('Redirect URI copied!', 'success');" class="mt-1.5 px-2.5 py-1 bg-stone-900 text-white text-[10px] font-semibold rounded hover:bg-stone-800">
+            Copy Redirect URI for Google Console
+          </button>
+        `;
+        actionContainer.classList.remove('hidden');
+      } else {
+        actionContainer.classList.add('hidden');
+      }
     }
 
     function hideAuthAlert() {
@@ -316,26 +348,32 @@
             cancel_on_tap_outside: true
           });
 
-          // Render official GSI button
+          // Render official GSI button into the slot container
           const slot = document.getElementById('gsi-slot-container');
           if (slot) {
             slot.innerHTML = '';
             google.accounts.id.renderButton(slot, {
               theme: 'outline',
               size: 'large',
+              type: 'standard',
               text: 'continue_with',
               shape: 'rectangular',
               logo_alignment: 'left',
-              width: 320
+              width: 340
             });
+            // When official button is rendered, hide fallback button so users click Google's native popup button
+            document.getElementById('google-signin-btn')?.classList.add('hidden');
           }
         } catch (e) {
           console.error("GSI initialization error:", e);
+          document.getElementById('google-signin-btn')?.classList.remove('hidden');
         }
+      } else {
+        document.getElementById('google-signin-btn')?.classList.remove('hidden');
       }
     }
 
-    // Triggered when user clicks "Continue with Google"
+    // Triggered if fallback "Continue with Google" button is clicked
     function initiateGoogleSignIn() {
       if (isAuthenticating) return;
 
@@ -360,12 +398,8 @@
             if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
               setButtonLoading(false);
               isAuthenticating = false;
-              // If One Tap is blocked, suggest redirect flow
-              showAuthAlert(
-                "Popup Blocked or Dismissed",
-                "Google's popup prompt could not be displayed. Click 'Sign in via Full Page Redirect' below to authenticate directly.",
-                "warning"
-              );
+              // If One Tap is suppressed, run full-page redirect flow
+              startRedirectOAuthFlow();
             } else if (notification.isDismissedMoment()) {
               setButtonLoading(false);
               isAuthenticating = false;
@@ -396,8 +430,10 @@
       }
 
       setButtonLoading(true, "Redirecting to Google...");
+      const redirectUri = window.location.origin + '/api/auth/google/callback';
+
       try {
-        const res = await fetch(`/api/auth/google/url?redirect_uri=${encodeURIComponent(window.location.origin + '/api/auth/google/callback')}`);
+        const res = await fetch(`/api/auth/google/url?redirect_uri=${encodeURIComponent(redirectUri)}`);
         if (res.ok) {
           const data = await res.json();
           window.location.href = data.url;
@@ -406,7 +442,6 @@
       } catch (e) {}
 
       // Fallback direct construct
-      const redirectUri = window.location.origin + '/api/auth/google/callback';
       const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?response_type=code&client_id=${encodeURIComponent(activeClientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=openid%20email%20profile&access_type=offline&prompt=select_account`;
       window.location.href = authUrl;
     }
@@ -425,10 +460,22 @@
       localStorage.removeItem(GOOGLE_CLIENT_ID_KEY);
       const input = document.getElementById('custom-google-client-id');
       if (input) input.value = '';
-      const slot = document.getElementById('gsi-slot-container');
-      if (slot) slot.innerHTML = '';
-      activeClientId = '';
-      showToast("Custom Google Client ID reset.", "info");
+      activeClientId = DEFAULT_CLIENT_ID;
+      setupGoogleGsi(DEFAULT_CLIENT_ID);
+      showToast("Reset to default Client ID.", "info");
+    }
+
+    function copyOriginToClipboard() {
+      navigator.clipboard.writeText(window.location.origin).then(() => {
+        showToast("Origin copied to clipboard!", "success");
+      });
+    }
+
+    function copyRedirectToClipboard() {
+      const uri = window.location.origin + '/api/auth/google/callback';
+      navigator.clipboard.writeText(uri).then(() => {
+        showToast("Redirect URI copied to clipboard!", "success");
+      });
     }
 
     // Page initialization
@@ -469,6 +516,14 @@
       const effectiveId = storedClientId || serverClientId || DEFAULT_CLIENT_ID;
       if (input && !input.value) input.value = effectiveId;
       if (effectiveId) {
+        setupGoogleGsi(effectiveId);
+      }
+    });
+
+    // Backup initialization after GSI script finishes loading
+    window.addEventListener('load', () => {
+      const effectiveId = localStorage.getItem(GOOGLE_CLIENT_ID_KEY) || DEFAULT_CLIENT_ID;
+      if (effectiveId && document.getElementById('gsi-slot-container')?.childElementCount === 0) {
         setupGoogleGsi(effectiveId);
       }
     });
