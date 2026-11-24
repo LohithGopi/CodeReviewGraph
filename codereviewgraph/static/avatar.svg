@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e2b10"/>
+      <stop offset="100%" stop-color="#2d3f18"/>
+    </linearGradient>
+    <linearGradient id="faceGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f5f5f4"/>
+      <stop offset="100%" stop-color="#e7e5e4"/>
+    </linearGradient>
+    <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#c4dd5a"/>
+      <stop offset="100%" stop-color="#a8c242"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="3" stdDeviation="3" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+
+  <!-- Background Circle -->
+  <circle cx="60" cy="60" r="58" fill="url(#bgGrad)" stroke="#a8c242" stroke-width="2.5" stroke-opacity="0.3"/>
+
+  <!-- Code/Tech Pattern Behind -->
+  <path d="M 28 40 L 20 48 L 28 56" fill="none" stroke="#a8c242" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.35"/>
+  <path d="M 92 40 L 100 48 L 92 56" fill="none" stroke="#a8c242" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.35"/>
+
+  <!-- Body / Shoulders -->
+  <path d="M 26 106 C 26 88 42 78 60 78 C 78 78 94 88 94 106" fill="#18230c" stroke="#3e5517" stroke-width="1.5"/>
+  <!-- Hoodie Collar / Accent Trim -->
+  <path d="M 44 80 L 60 96 L 76 80" fill="none" stroke="url(#accentGrad)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Neck -->
+  <rect x="53" y="66" width="14" height="15" rx="3" fill="#e7e5e4"/>
+
+  <!-- Head -->
+  <rect x="40" y="28" width="40" height="42" rx="14" fill="url(#faceGrad)" filter="url(#shadow)"/>
+
+  <!-- Hair / Visor Cap -->
+  <path d="M 37 36 C 37 24 46 18 60 18 C 74 18 83 24 83 36 C 75 33 65 34 60 37 C 53 34 44 34 37 36 Z" fill="#1c1d1a"/>
+
+  <!-- Futuristic Cyber Glasses / HUD -->
+  <rect x="42" y="38" width="36" height="14" rx="4" fill="#18230c" stroke="url(#accentGrad)" stroke-width="1.5"/>
+  <!-- Glowing Lens Line -->
+  <line x1="46" y1="45" x2="74" y2="45" stroke="#a8c242" stroke-width="2" stroke-linecap="round"/>
+
+  <!-- Smirk / Smile -->
+  <path d="M 53 58 Q 60 63 67 58" fill="none" stroke="#78716c" stroke-width="2" stroke-linecap="round"/>
+
+  <!-- Online Verification Badge -->
+  <circle cx="94" cy="94" r="11" fill="#18230c" stroke="#fafaf9" stroke-width="2"/>
+  <circle cx="94" cy="94" r="6" fill="#22c55e"/>
+</svg>
