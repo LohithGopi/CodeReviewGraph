@@ -68,24 +68,48 @@ def test_api_get_run_checkpoint():
 
 
 def test_api_auth_google():
-    response = client.post("/api/auth/google", json={
+    # Empty/missing credentials should return 400 Bad Request
+    response = client.post("/api/auth/google", json={})
+    assert response.status_code == 400
+
+    from unittest.mock import patch
+    from codereviewgraph.api.auth import auth_service
+    with patch.object(auth_service, "verify_id_token", return_value={
+        "google_id": "google-test-sub-1",
         "email": "alex.test@gmail.com",
-        "name": "Alex Test"
-    })
-    assert response.status_code == 200
-    data = response.json()
-    assert data["email"] == "alex.test@gmail.com"
-    assert data["name"] == "Alex Test"
-    assert data["provider"] == "google"
-    assert data["authenticated"] is True
+        "name": "Alex Test",
+        "picture": "/static/avatar.png",
+        "email_verified": True
+    }):
+        valid_res = client.post("/api/auth/google", json={"credential": "mock-test-jwt"})
+        assert valid_res.status_code == 200
+        data = valid_res.json()
+        assert data["email"] == "alex.test@gmail.com"
+        assert data["name"] == "Alex Test"
+        assert data["provider"] == "google"
+        assert data["authenticated"] is True
 
 
 def test_api_auth_me():
+    # Unauthenticated request without session cookie returns 401
+    client.cookies.clear()
+    unauth_res = client.get("/api/auth/me")
+    assert unauth_res.status_code == 401
+
+    # Authenticated request with session cookie returns 200 UserProfile
+    from codereviewgraph.storage.user_db import user_db
+    from codereviewgraph.api.auth import SESSION_COOKIE_NAME
+    user = user_db.create_or_update_google_user("g-sub-me-1", "me.test@gmail.com", "Me Test")
+    session_id = user_db.create_session(user["id"])
+    client.cookies.set(SESSION_COOKIE_NAME, session_id)
+
     response = client.get("/api/auth/me")
     assert response.status_code == 200
     data = response.json()
     assert data["authenticated"] is True
     assert data["provider"] == "google"
+    assert data["email"] == "me.test@gmail.com"
+    client.cookies.clear()
 
 
 def test_api_auth_config():

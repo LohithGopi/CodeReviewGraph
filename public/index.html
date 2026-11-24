@@ -341,39 +341,43 @@
 
   <!-- Client Auth State Checker -->
   <script>
-    (function checkAuthState() {
+    async function checkAuthState() {
       try {
-        const raw = localStorage.getItem('crg_auth_user');
-        if (!raw) return;
-        const user = JSON.parse(raw);
-        if (user && user.authenticated) {
-          // Update navbar
-          document.getElementById('nav-login-link')?.classList.add('hidden');
-          const pill = document.getElementById('nav-user-pill');
-          if (pill) {
-            pill.classList.remove('hidden');
-            pill.classList.add('flex');
-          }
-          if (user.name) document.getElementById('nav-user-name').innerText = user.name;
-          if (user.picture) document.getElementById('nav-user-img').src = user.picture;
+        const res = await fetch('/api/auth/me', { credentials: 'include' });
+        if (res.ok) {
+          const user = await res.json();
+          if (user && user.authenticated) {
+            // Update navbar
+            document.getElementById('nav-login-link')?.classList.add('hidden');
+            const pill = document.getElementById('nav-user-pill');
+            if (pill) {
+              pill.classList.remove('hidden');
+              pill.classList.add('flex');
+            }
+            if (user.name) document.getElementById('nav-user-name').innerText = user.name;
+            if (user.picture) document.getElementById('nav-user-img').src = user.picture;
 
-          // Update CTAs to point straight to /playground
-          const heroCta = document.getElementById('hero-primary-cta');
-          if (heroCta) {
-            heroCta.href = '/playground';
-            heroCta.innerHTML = '<span>Open Live Workstation</span><span>&rarr;</span>';
-          }
-          const bannerCta = document.getElementById('banner-cta-btn');
-          if (bannerCta) {
-            bannerCta.href = '/playground';
-            bannerCta.innerHTML = 'Open Live Workstation &rarr;';
+            // Update CTAs to point straight to /playground
+            const heroCta = document.getElementById('hero-primary-cta');
+            if (heroCta) {
+              heroCta.href = '/playground';
+              heroCta.innerHTML = '<span>Open Live Workstation</span><span>&rarr;</span>';
+            }
+            const bannerCta = document.getElementById('banner-cta-btn');
+            if (bannerCta) {
+              bannerCta.href = '/playground';
+              bannerCta.innerHTML = 'Open Live Workstation &rarr;';
+            }
           }
         }
       } catch (e) {}
-    })();
+    }
+    checkAuthState();
 
-    function handleSignOut() {
-      localStorage.removeItem('crg_auth_user');
+    async function handleSignOut() {
+      try {
+        await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+      } catch (e) {}
       window.location.reload();
     }
   </script>

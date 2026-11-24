@@ -18,17 +18,12 @@
 </head>
 <body class="bg-[#fafaf9] text-[#1c1d1a] min-h-screen flex flex-col antialiased selection:bg-[#a8c242]/30">
 
-  <!-- Auth Gate Check (Client Side) -->
+  <!-- Auth Gate Check (HTTP-only Session Verification) -->
   <script>
-    (function requireAuth() {
+    (async function requireAuth() {
       try {
-        const raw = localStorage.getItem('crg_auth_user');
-        if (!raw) {
-          window.location.href = '/login';
-          return;
-        }
-        const user = JSON.parse(raw);
-        if (!user || !user.authenticated) {
+        const res = await fetch('/api/auth/me', { credentials: 'include' });
+        if (!res.ok) {
           window.location.href = '/login';
         }
       } catch (e) {
@@ -248,30 +243,32 @@
   </footer>
 
   <script>
-    const AUTH_KEY = 'crg_auth_user';
     let latestMarkdown = "";
     let latestDiff = "";
 
-    // Sync user profile in UI
-    (function initUserProfile() {
+    // Sync authenticated user profile from backend session
+    async function initUserProfile() {
       try {
-        const raw = localStorage.getItem(AUTH_KEY);
-        if (raw) {
-          const user = JSON.parse(raw);
+        const res = await fetch('/api/auth/me', { credentials: 'include' });
+        if (res.ok) {
+          const user = await res.json();
           if (user) {
             document.getElementById('user-display-name').innerText = user.name || 'Developer';
-            document.getElementById('user-display-email').innerText = user.email || 'developer@gmail.com';
+            document.getElementById('user-display-email').innerText = user.email || '';
             if (user.picture) {
               document.getElementById('user-avatar-img').src = user.picture;
             }
           }
         }
       } catch (e) {}
-    })();
+    }
+    initUserProfile();
 
-    function handleSignOut() {
-      localStorage.removeItem(AUTH_KEY);
-      window.location.href = '/';
+    async function handleSignOut() {
+      try {
+        await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+      } catch (e) {}
+      window.location.href = '/login';
     }
 
     const PRESETS = {
@@ -384,6 +381,7 @@ def run_system_diagnostic(user_host: str):
         const res = await fetch('/api/audit', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
           body: JSON.stringify({ code: code, language: 'python', thread_id: threadId })
         });
 

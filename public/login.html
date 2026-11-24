@@ -10,7 +10,7 @@
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
   <link rel="alternate icon" type="image/png" href="/static/logo.png">
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Google Identity Services (GSI) -->
+  <!-- Google Identity Services (GSI) SDK -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
@@ -45,7 +45,21 @@
       <div class="space-y-1.5">
         <h1 class="text-2xl font-bold tracking-tight text-[#1c1d1a]">Sign in to CodeReviewGraph</h1>
         <p class="text-xs text-stone-500 max-w-xs mx-auto">
-          Authenticate to access the multi-agent code workstation &amp; automated patch generator.
+          Authenticate with your verified Google account to access the multi-agent code workstation.
+        </p>
+      </div>
+
+      <!-- Interactive Error / Status Banner -->
+      <div id="auth-alert-banner" class="hidden text-left p-3.5 rounded-2xl border text-xs transition-all space-y-1">
+        <div class="flex items-start justify-between gap-2">
+          <div class="flex items-center gap-2 font-semibold" id="auth-alert-title">
+            <span id="auth-alert-icon">⚠️</span>
+            <span id="auth-alert-heading">Authentication Notice</span>
+          </div>
+          <button type="button" onclick="hideAuthAlert()" class="text-stone-400 hover:text-stone-700 text-sm leading-none">&times;</button>
+        </div>
+        <p id="auth-alert-body" class="text-[11px] leading-relaxed text-stone-600 pl-5">
+          Notice details.
         </p>
       </div>
 
@@ -53,128 +67,83 @@
       <div class="space-y-4 text-left">
         
         <!-- Continue with Google Button -->
-        <button id="google-signin-btn" onclick="openGoogleAccountChooser()" class="w-full flex items-center justify-center gap-3 px-4 py-3 rounded-xl border border-stone-300 hover:border-stone-400 bg-white hover:bg-stone-50 text-stone-700 text-xs sm:text-sm font-semibold shadow-xs hover:shadow-md transition active:scale-[0.99] group">
+        <button id="google-signin-btn" type="button" onclick="initiateGoogleSignIn()" class="w-full flex items-center justify-center gap-3 px-4 py-3 rounded-xl border border-stone-300 hover:border-stone-400 bg-white hover:bg-stone-50 text-stone-700 text-xs sm:text-sm font-semibold shadow-xs hover:shadow-md transition active:scale-[0.99] group disabled:opacity-60 disabled:cursor-not-allowed">
           <!-- Google 4-color SVG icon -->
-          <svg class="w-5 h-5 shrink-0" viewBox="0 0 24 24">
+          <svg id="google-icon-svg" class="w-5 h-5 shrink-0" viewBox="0 0 24 24">
             <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.65v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.14z"/>
             <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.26v3.15C3.27 21.36 7.34 24 12 24z"/>
             <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.26C.46 8.16 0 9.94 0 12s.46 3.84 1.26 5.42l4.02-3.15z"/>
             <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.34 0 3.27 2.64 1.26 6.58l4.02 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
           </svg>
+          <!-- Spinner SVG (hidden by default) -->
+          <svg id="google-spinner-svg" class="hidden animate-spin w-5 h-5 text-stone-600 shrink-0" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
           <span id="google-btn-text">Continue with Google</span>
         </button>
 
-        <!-- Native GSI Slot (rendered when Client ID is configured) -->
-        <div id="gsi-slot-container" class="flex justify-center empty:hidden"></div>
+        <!-- Official Google Identity Services Render Target -->
+        <div id="gsi-slot-container" class="flex justify-center min-h-[44px] empty:hidden"></div>
 
-        <!-- Google Interactive Account Chooser (Shown on Google click) -->
-        <div id="google-account-panel" class="hidden p-3.5 rounded-2xl bg-blue-50/50 border border-blue-200/80 space-y-3 transition-all">
-          <div class="flex items-center justify-between">
-            <span class="text-[11px] font-semibold text-blue-900 uppercase tracking-wider">Choose Google Account</span>
-            <button type="button" onclick="closeGoogleAccountChooser()" class="text-xs text-stone-400 hover:text-stone-700">&times; close</button>
-          </div>
-
-          <!-- Quick Test Accounts -->
-          <div class="space-y-2">
-            <button type="button" onclick="loginWithProfile('alex.rivers.dev@gmail.com', 'Alex Rivers')" class="w-full flex items-center justify-between p-2.5 rounded-xl bg-white border border-stone-200 hover:border-blue-400 hover:shadow-xs transition group">
-              <div class="flex items-center space-x-2.5">
-                <div class="w-8 h-8 rounded-full bg-[#4285F4] text-white font-semibold flex items-center justify-center text-xs">
-                  A
-                </div>
-                <div class="text-left">
-                  <div class="text-xs font-semibold text-stone-900 group-hover:text-blue-700">Alex Rivers</div>
-                  <div class="text-[11px] font-mono text-stone-500">alex.rivers.dev@gmail.com</div>
-                </div>
-              </div>
-              <span class="text-blue-600 text-xs font-semibold">&rarr;</span>
-            </button>
-
-            <button type="button" onclick="loginWithProfile('sarah.chen.security@gmail.com', 'Sarah Chen')" class="w-full flex items-center justify-between p-2.5 rounded-xl bg-white border border-stone-200 hover:border-emerald-400 hover:shadow-xs transition group">
-              <div class="flex items-center space-x-2.5">
-                <div class="w-8 h-8 rounded-full bg-[#34A853] text-white font-semibold flex items-center justify-center text-xs">
-                  S
-                </div>
-                <div class="text-left">
-                  <div class="text-xs font-semibold text-stone-900 group-hover:text-emerald-700">Sarah Chen</div>
-                  <div class="text-[11px] font-mono text-stone-500">sarah.chen.security@gmail.com</div>
-                </div>
-              </div>
-              <span class="text-emerald-600 text-xs font-semibold">&rarr;</span>
-            </button>
-          </div>
-
-          <!-- Use Custom Google Account Toggle -->
-          <div class="pt-1">
-            <button type="button" onclick="toggleCustomGoogleInput()" class="text-[11px] text-blue-700 hover:text-blue-900 font-medium underline underline-offset-2">
-              + Use another Google account
-            </button>
-          </div>
-
-          <!-- Custom Google Form -->
-          <form id="custom-google-form" onsubmit="handleCustomGoogleSubmit(event)" class="hidden space-y-2 pt-2 border-t border-blue-200/60">
-            <div>
-              <label class="block text-[11px] font-medium text-stone-700 mb-1">Your Google / Gmail address</label>
-              <input type="email" id="custom-google-email" required placeholder="your.name@gmail.com" class="w-full px-3 py-2 rounded-xl border border-stone-300 bg-white text-xs text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#4285F4]">
-            </div>
-            <div>
-              <label class="block text-[11px] font-medium text-stone-700 mb-1">Display Name (optional)</label>
-              <input type="text" id="custom-google-name" placeholder="John Doe" class="w-full px-3 py-2 rounded-xl border border-stone-300 bg-white text-xs text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#4285F4]">
-            </div>
-            <button type="submit" class="w-full py-2 rounded-xl bg-[#1a73e8] hover:bg-[#1557b0] text-white text-xs font-semibold transition flex items-center justify-center gap-1.5 shadow-xs">
-              <span>Sign in as Google User</span>
-              <span>&rarr;</span>
-            </button>
-          </form>
-
+        <!-- Alternate OAuth Redirect Flow Link -->
+        <div class="pt-2 text-center text-[11px] text-stone-500">
+          <span>Having trouble with the popup? </span>
+          <button type="button" onclick="startRedirectOAuthFlow()" class="text-[#3e5517] font-semibold underline underline-offset-2 hover:text-[#2d3f18]">
+            Sign in via Full Page Redirect &rarr;
+          </button>
         </div>
 
         <div class="flex items-center gap-3 my-2">
           <div class="h-px bg-stone-200 flex-1"></div>
-          <span class="text-[11px] font-mono text-stone-400 uppercase tracking-wider">or email</span>
+          <span class="text-[11px] font-mono text-stone-400 uppercase tracking-wider">OAuth 2.0 Security</span>
           <div class="h-px bg-stone-200 flex-1"></div>
         </div>
 
-        <!-- Developer Email Sign In Form -->
-        <form onsubmit="handleEmailSignIn(event)" class="space-y-2.5">
-          <div>
-            <label class="block text-[11px] font-medium text-stone-600 mb-1">Developer Email</label>
-            <input type="email" id="dev-email-input" required placeholder="developer@company.com" class="w-full px-3.5 py-2.5 rounded-xl border border-stone-200 bg-stone-50 text-xs text-stone-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#a8c242] transition">
+        <!-- Security Guarantee Notice -->
+        <div class="p-3 rounded-xl bg-stone-50 border border-stone-200 text-[11px] text-stone-600 space-y-1">
+          <div class="flex items-center gap-1.5 font-medium text-stone-800">
+            <svg class="w-3.5 h-3.5 text-emerald-600" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M10 1.944A11.954 11.954 0 012.166 5C2.056 5.649 2 6.319 2 7c0 5.225 3.34 9.67 8 11.317C14.66 16.67 18 12.225 18 7c0-.682-.057-1.35-.166-2.001A11.954 11.954 0 0110 1.944zM11 14a1 1 0 11-2 0 1 1 0 012 0zm0-7a1 1 0 10-2 0v3a1 1 0 102 0V7z" clip-rule="evenodd" />
+            </svg>
+            <span>Verified Identity &amp; HTTP-only Session Protection</span>
           </div>
-          <button type="submit" class="w-full py-2.5 rounded-xl bg-[#2d3f18] hover:bg-[#202e11] text-[#f7f9f0] text-xs font-semibold shadow-xs transition">
-            Sign In with Email
-          </button>
-        </form>
-
-        <!-- 1-Click Instant Demo Login -->
-        <div class="pt-2 text-center text-[11px] text-stone-500">
-          <span>Need instant evaluation? </span>
-          <button type="button" onclick="quickDemoLogin()" class="text-[#3e5517] font-semibold underline underline-offset-2 hover:text-[#2d3f18]">
-            1-Click Google Demo Login &rarr;
-          </button>
+          <p class="text-[10px] text-stone-500 leading-relaxed">
+            All Google tokens are validated via Google's official public key infrastructure.
+            Sessions are secured with encrypted, HTTP-only, SameSite cookies.
+          </p>
         </div>
 
-        <!-- Advanced Google OAuth Client ID Drawer -->
+        <!-- Google OAuth Credentials & Troubleshooting Drawer -->
         <div class="pt-2">
-          <details class="text-[11px] text-stone-500 group">
+          <details id="credentials-drawer" class="text-[11px] text-stone-500 group">
             <summary class="cursor-pointer hover:text-stone-700 flex items-center justify-between list-none py-1">
               <span class="flex items-center gap-1.5 font-medium">
                 <svg class="w-3.5 h-3.5 text-stone-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><circle cx="12" cy="12" r="3"/></svg>
-                Google Cloud OAuth 2.0 Client ID (Optional)
+                Google Cloud Console Configuration Status
               </span>
               <span class="group-open:rotate-180 transition-transform">&darr;</span>
             </summary>
-            <div class="mt-2 space-y-2 p-2.5 rounded-xl bg-stone-50 border border-stone-200">
-              <p class="text-[10px] text-stone-500 leading-relaxed">
-                Enter your Google Cloud OAuth Client ID to trigger Google's native One-Tap popup.
-              </p>
-              <input type="text" id="custom-google-client-id" placeholder="your-client-id.apps.googleusercontent.com" class="w-full px-2.5 py-1.5 rounded-lg border border-stone-300 bg-white text-[11px] font-mono text-stone-900 focus:outline-none focus:ring-1 focus:ring-blue-500">
+            <div class="mt-2 space-y-2.5 p-3 rounded-xl bg-stone-50 border border-stone-200">
+              <div class="flex items-center justify-between text-[10px]">
+                <span class="text-stone-500">Backend Server Status:</span>
+                <span id="cfg-server-status" class="font-mono font-semibold px-2 py-0.5 rounded bg-stone-200 text-stone-700">Checking...</span>
+              </div>
+              <div>
+                <label class="block text-[10px] font-medium text-stone-600 mb-1">Active Google Client ID</label>
+                <input type="text" id="custom-google-client-id" placeholder="your-client-id.apps.googleusercontent.com" class="w-full px-2.5 py-1.5 rounded-lg border border-stone-300 bg-white text-[11px] font-mono text-stone-900 focus:outline-none focus:ring-1 focus:ring-blue-500">
+              </div>
               <div class="flex items-center gap-2">
-                <button type="button" onclick="saveGoogleClientId()" class="px-3 py-1 rounded-lg bg-stone-800 hover:bg-stone-900 text-white text-[11px] font-medium transition">
-                  Save &amp; Initialize GSI
+                <button type="button" onclick="saveGoogleClientId()" class="px-3 py-1.5 rounded-lg bg-stone-800 hover:bg-stone-900 text-white text-[11px] font-medium transition">
+                  Apply Client ID
                 </button>
-                <button type="button" onclick="clearGoogleClientId()" class="px-2 py-1 text-[11px] text-stone-500 hover:text-rose-600 transition">
-                  Clear
+                <button type="button" onclick="clearGoogleClientId()" class="px-2 py-1.5 text-[11px] text-stone-500 hover:text-rose-600 transition">
+                  Reset
                 </button>
+              </div>
+              <div class="text-[10px] text-stone-500 pt-1 space-y-1 border-t border-stone-200/80">
+                <p><strong>Authorized JavaScript origins:</strong> <code class="font-mono text-stone-700" id="current-origin-label">...</code></p>
+                <p><strong>Authorized redirect URI:</strong> <code class="font-mono text-stone-700" id="current-redirect-label">...</code></p>
               </div>
             </div>
           </details>
@@ -194,21 +163,43 @@
   <div id="toast-container" class="fixed bottom-6 right-6 z-50 flex flex-col gap-2 pointer-events-none"></div>
 
   <script>
-    const AUTH_KEY = 'crg_auth_user';
     const GOOGLE_CLIENT_ID_KEY = 'crg_google_client_id';
-    window.crgServerClientId = '';
+    let isAuthenticating = false;
+    let activeClientId = '';
 
-    // Check if user is already logged in
-    (function checkExistingSession() {
+    // Check if user already has an active authenticated session
+    (async function checkExistingSession() {
       try {
-        const raw = localStorage.getItem(AUTH_KEY);
-        if (raw) {
-          const user = JSON.parse(raw);
+        const res = await fetch('/api/auth/me', { credentials: 'include' });
+        if (res.ok) {
+          const user = await res.json();
           if (user && user.authenticated) {
             window.location.href = '/playground';
           }
         }
       } catch (e) {}
+    })();
+
+    // Check URL parameters for errors redirected from OAuth callbacks
+    (function checkUrlErrors() {
+      const params = new URLSearchParams(window.location.search);
+      const err = params.get('error');
+      const msg = params.get('message');
+      if (err) {
+        let displayHeading = "Sign In Notice";
+        let displayBody = msg || "An error occurred during authentication.";
+        if (err.includes('cancel') || err.includes('access_denied')) {
+          displayHeading = "Login Cancelled";
+          displayBody = "Google Sign-In was cancelled. Please try again when ready.";
+        } else if (err.includes('csrf') || err.includes('state')) {
+          displayHeading = "Security Verification Failed";
+          displayBody = "OAuth state validation failed. Please retry your login request.";
+        } else if (err.includes('conflict')) {
+          displayHeading = "Account Conflict";
+          displayBody = decodeURIComponent(msg || "An account with this email already exists under a different provider.");
+        }
+        showAuthAlert(displayHeading, displayBody, 'error');
+      }
     })();
 
     function showToast(message, type = 'info') {
@@ -226,118 +217,105 @@
       setTimeout(() => {
         toast.classList.add('opacity-0', 'translate-y-2');
         setTimeout(() => toast.remove(), 300);
-      }, 3500);
+      }, 4000);
     }
 
-    function generateGoogleAvatar(name, email) {
-      const initial = (name || email || 'G').trim().charAt(0).toUpperCase();
-      const colors = ['#4285F4', '#34A853', '#EA4335', '#FBBC05', '#1a73e8'];
-      let hash = 0;
-      const str = (name || email || 'G');
-      for (let i = 0; i < str.length; i++) hash = (hash << 5) - hash + str.charCodeAt(i);
-      const color = colors[Math.abs(hash) % colors.length];
-      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96"><circle cx="48" cy="48" r="48" fill="${color}"/><text x="50%" y="54%" font-family="Plus Jakarta Sans, sans-serif" font-size="44" font-weight="600" fill="#ffffff" dominant-baseline="middle" text-anchor="middle">${initial}</text></svg>`;
-      return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+    function showAuthAlert(heading, body, type = 'error') {
+      const banner = document.getElementById('auth-alert-banner');
+      if (!banner) return;
+      banner.className = type === 'error' 
+        ? "text-left p-3.5 rounded-2xl border bg-rose-50 border-rose-200 text-xs text-rose-900 space-y-1 block"
+        : "text-left p-3.5 rounded-2xl border bg-amber-50 border-amber-200 text-xs text-amber-900 space-y-1 block";
+      document.getElementById('auth-alert-icon').innerText = type === 'error' ? '✕' : '⚠️';
+      document.getElementById('auth-alert-heading').innerText = heading;
+      document.getElementById('auth-alert-body').innerText = body;
     }
 
-    function openGoogleAccountChooser() {
-      const storedClientId = localStorage.getItem(GOOGLE_CLIENT_ID_KEY) || window.crgServerClientId;
-      if (storedClientId && typeof google !== 'undefined' && google.accounts && google.accounts.id) {
-        try {
-          google.accounts.id.prompt((notification) => {
-            if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-              document.getElementById('google-account-panel')?.classList.remove('hidden');
-            }
-          });
-          return;
-        } catch (e) {}
+    function hideAuthAlert() {
+      const banner = document.getElementById('auth-alert-banner');
+      if (banner) banner.classList.add('hidden');
+    }
+
+    function setButtonLoading(loading, message = "Continue with Google") {
+      const btn = document.getElementById('google-signin-btn');
+      const icon = document.getElementById('google-icon-svg');
+      const spinner = document.getElementById('google-spinner-svg');
+      const text = document.getElementById('google-btn-text');
+
+      if (!btn) return;
+      btn.disabled = loading;
+      if (loading) {
+        icon.classList.add('hidden');
+        spinner.classList.remove('hidden');
+        text.innerText = message;
+      } else {
+        spinner.classList.add('hidden');
+        icon.classList.remove('hidden');
+        text.innerText = message;
       }
-      document.getElementById('google-account-panel')?.classList.toggle('hidden');
     }
 
-    function closeGoogleAccountChooser() {
-      document.getElementById('google-account-panel')?.classList.add('hidden');
-    }
+    // Google Identity Services (GSI) Credential Response Handler
+    async function handleGoogleCredentialResponse(response) {
+      if (!response || !response.credential) {
+        showAuthAlert("Authentication Failed", "Google did not return an identity token. Please try again.", "error");
+        setButtonLoading(false);
+        isAuthenticating = false;
+        return;
+      }
 
-    function toggleCustomGoogleInput() {
-      const form = document.getElementById('custom-google-form');
-      if (form) form.classList.toggle('hidden');
-    }
+      setButtonLoading(true, "Verifying Google Token...");
+      hideAuthAlert();
 
-    async function loginWithProfile(email, name, picture) {
-      const avatar = picture || generateGoogleAvatar(name, email);
       try {
         const res = await fetch('/api/auth/google', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: name, email: email, picture: avatar })
-        });
-        const profile = await res.json();
-        localStorage.setItem(AUTH_KEY, JSON.stringify({
-          id: profile.id,
-          name: profile.name || name,
-          email: profile.email || email,
-          picture: profile.picture || avatar,
-          provider: "google",
-          authenticated: true
-        }));
-      } catch (e) {
-        localStorage.setItem(AUTH_KEY, JSON.stringify({
-          name: name,
-          email: email,
-          picture: avatar,
-          provider: "google",
-          authenticated: true
-        }));
-      }
-
-      showToast(`Signed in as ${name}! Redirecting to playground...`, 'success');
-      setTimeout(() => {
-        window.location.href = '/playground';
-      }, 300);
-    }
-
-    function handleCustomGoogleSubmit(event) {
-      if (event) event.preventDefault();
-      const email = document.getElementById('custom-google-email')?.value.trim();
-      if (!email) return;
-      let name = document.getElementById('custom-google-name')?.value.trim();
-      if (!name) {
-        name = email.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-      }
-      loginWithProfile(email, name);
-    }
-
-    // Native Google GSI Response
-    async function handleGoogleGsiResponse(response) {
-      if (!response || !response.credential) return;
-      showToast("Verifying with Google...", "info");
-      try {
-        const res = await fetch('/api/auth/google', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include', // Guarantees HTTP-only cookie storage
           body: JSON.stringify({ credential: response.credential })
         });
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          const errMsg = errData.detail || `Server responded with HTTP ${res.status}`;
+          showAuthAlert("Verification Failed", errMsg, "error");
+          showToast(`Google Sign-In failed: ${errMsg}`, "error");
+          setButtonLoading(false);
+          isAuthenticating = false;
+          return;
+        }
+
         const profile = await res.json();
-        localStorage.setItem(AUTH_KEY, JSON.stringify(profile));
-        showToast(`Signed in as ${profile.name}! Redirecting...`, 'success');
+        showToast(`Welcome, ${profile.name}! Redirecting to workstation...`, "success");
+        setButtonLoading(true, "Redirecting to workstation...");
+
         setTimeout(() => {
           window.location.href = '/playground';
-        }, 300);
+        }, 350);
+
       } catch (err) {
-        showToast("Google authentication failed. Please try again.", "error");
+        showAuthAlert("Network Error", "Unable to communicate with the authentication server. Please check your network.", "error");
+        showToast("Network error during verification.", "error");
+        setButtonLoading(false);
+        isAuthenticating = false;
       }
     }
 
+    // Initialize Google Identity Services
     function setupGoogleGsi(clientId) {
       if (!clientId) return;
+      activeClientId = clientId;
+
       if (typeof google !== 'undefined' && google.accounts && google.accounts.id) {
         try {
           google.accounts.id.initialize({
             client_id: clientId,
-            callback: handleGoogleGsiResponse,
-            auto_select: false
+            callback: handleGoogleCredentialResponse,
+            auto_select: false,
+            cancel_on_tap_outside: true
           });
+
+          // Render official GSI button
           const slot = document.getElementById('gsi-slot-container');
           if (slot) {
             slot.innerHTML = '';
@@ -345,12 +323,91 @@
               theme: 'outline',
               size: 'large',
               text: 'continue_with',
-              shape: 'pill',
-              width: 280
+              shape: 'rectangular',
+              logo_alignment: 'left',
+              width: 320
             });
           }
-        } catch (e) {}
+        } catch (e) {
+          console.error("GSI initialization error:", e);
+        }
       }
+    }
+
+    // Triggered when user clicks "Continue with Google"
+    function initiateGoogleSignIn() {
+      if (isAuthenticating) return;
+
+      if (!activeClientId) {
+        showAuthAlert(
+          "Google Client ID Required",
+          "Google OAuth 2.0 is not configured on this server yet. Enter your Google Client ID in the configuration drawer below or configure GOOGLE_CLIENT_ID on your server.",
+          "warning"
+        );
+        document.getElementById('credentials-drawer')?.setAttribute('open', 'true');
+        document.getElementById('custom-google-client-id')?.focus();
+        return;
+      }
+
+      isAuthenticating = true;
+      setButtonLoading(true, "Connecting to Google...");
+      hideAuthAlert();
+
+      if (typeof google !== 'undefined' && google.accounts && google.accounts.id) {
+        try {
+          google.accounts.id.prompt((notification) => {
+            if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+              setButtonLoading(false);
+              isAuthenticating = false;
+              // If One Tap is blocked, suggest redirect flow
+              showAuthAlert(
+                "Popup Blocked or Dismissed",
+                "Google's popup prompt could not be displayed. Click 'Sign in via Full Page Redirect' below to authenticate directly.",
+                "warning"
+              );
+            } else if (notification.isDismissedMoment()) {
+              setButtonLoading(false);
+              isAuthenticating = false;
+            }
+          });
+        } catch (e) {
+          setButtonLoading(false);
+          isAuthenticating = false;
+          startRedirectOAuthFlow();
+        }
+      } else {
+        setButtonLoading(false);
+        isAuthenticating = false;
+        startRedirectOAuthFlow();
+      }
+    }
+
+    // Full-page OAuth redirect flow
+    async function startRedirectOAuthFlow() {
+      if (!activeClientId) {
+        showAuthAlert(
+          "Google Client ID Required",
+          "Google Client ID is not configured. Please supply your Client ID to proceed.",
+          "warning"
+        );
+        document.getElementById('credentials-drawer')?.setAttribute('open', 'true');
+        return;
+      }
+
+      setButtonLoading(true, "Redirecting to Google...");
+      try {
+        const res = await fetch(`/api/auth/google/url?redirect_uri=${encodeURIComponent(window.location.origin + '/api/auth/google/callback')}`);
+        if (res.ok) {
+          const data = await res.json();
+          window.location.href = data.url;
+          return;
+        }
+      } catch (e) {}
+
+      // Fallback direct construct
+      const redirectUri = window.location.origin + '/api/auth/google/callback';
+      const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?response_type=code&client_id=${encodeURIComponent(activeClientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=openid%20email%20profile&access_type=offline&prompt=select_account`;
+      window.location.href = authUrl;
     }
 
     function saveGoogleClientId() {
@@ -358,7 +415,8 @@
       if (val) {
         localStorage.setItem(GOOGLE_CLIENT_ID_KEY, val);
         setupGoogleGsi(val);
-        showToast("Google Client ID saved. Initializing 1-Tap...", "success");
+        hideAuthAlert();
+        showToast("Google Client ID applied. You can now Sign In.", "success");
       }
     }
 
@@ -368,52 +426,49 @@
       if (input) input.value = '';
       const slot = document.getElementById('gsi-slot-container');
       if (slot) slot.innerHTML = '';
-      showToast("Google Client ID cleared.", "info");
+      activeClientId = '';
+      showToast("Custom Google Client ID reset.", "info");
     }
 
-    function handleEmailSignIn(event) {
-      if (event) event.preventDefault();
-      const email = document.getElementById('dev-email-input')?.value.trim() || 'developer@company.com';
-      const name = email.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-      const avatar = generateGoogleAvatar(name, email);
-
-      localStorage.setItem(AUTH_KEY, JSON.stringify({
-        name: name || "Developer",
-        email: email,
-        picture: avatar,
-        provider: "email",
-        authenticated: true
-      }));
-
-      showToast(`Signed in as ${name}! Redirecting...`, 'success');
-      setTimeout(() => {
-        window.location.href = '/playground';
-      }, 300);
-    }
-
-    function quickDemoLogin() {
-      loginWithProfile("alex.rivers.dev@gmail.com", "Alex Rivers");
-    }
-
-    // Initialize Auth Config on Load
+    // Page initialization
     document.addEventListener('DOMContentLoaded', async () => {
-      const storedId = localStorage.getItem(GOOGLE_CLIENT_ID_KEY);
-      const input = document.getElementById('custom-google-client-id');
-      if (storedId && input) input.value = storedId;
+      // Display origin and callback info
+      const origin = window.location.origin;
+      const originLabel = document.getElementById('current-origin-label');
+      const redirectLabel = document.getElementById('current-redirect-label');
+      if (originLabel) originLabel.innerText = origin;
+      if (redirectLabel) redirectLabel.innerText = `${origin}/api/auth/google/callback`;
 
+      const storedClientId = localStorage.getItem(GOOGLE_CLIENT_ID_KEY);
+      const input = document.getElementById('custom-google-client-id');
+      if (storedClientId && input) input.value = storedClientId;
+
+      let serverClientId = '';
       try {
         const res = await fetch('/api/auth/config');
         if (res.ok) {
           const config = await res.json();
-          if (config.google_client_id) {
-            window.crgServerClientId = config.google_client_id;
-            if (!storedId && input) input.value = config.google_client_id;
+          const statusEl = document.getElementById('cfg-server-status');
+          if (config.configured && config.google_client_id) {
+            serverClientId = config.google_client_id;
+            if (statusEl) {
+              statusEl.innerText = "Configured (Ready)";
+              statusEl.className = "font-mono font-semibold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800";
+            }
+            if (!storedClientId && input) input.value = serverClientId;
+          } else {
+            if (statusEl) {
+              statusEl.innerText = "Not Set (Awaiting Env)";
+              statusEl.className = "font-mono font-semibold px-2 py-0.5 rounded bg-amber-100 text-amber-800";
+            }
           }
         }
       } catch (e) {}
 
-      const activeId = storedId || window.crgServerClientId;
-      if (activeId) setupGoogleGsi(activeId);
+      const effectiveId = storedClientId || serverClientId;
+      if (effectiveId) {
+        setupGoogleGsi(effectiveId);
+      }
     });
   </script>
 </body>
