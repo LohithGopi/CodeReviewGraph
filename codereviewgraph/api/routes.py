@@ -24,6 +24,22 @@ class AuditResponse(BaseModel):
     stage: Optional[str] = None
 
 
+class GoogleAuthRequest(BaseModel):
+    credential: Optional[str] = None
+    email: Optional[str] = "developer@gmail.com"
+    name: Optional[str] = "Developer"
+    picture: Optional[str] = None
+
+
+class UserProfile(BaseModel):
+    id: str
+    email: str
+    name: str
+    picture: Optional[str] = None
+    provider: str = "google"
+    authenticated: bool = True
+
+
 class HealthResponse(BaseModel):
     status: str
     service: str
@@ -37,6 +53,33 @@ def health_check():
         status="healthy",
         service="codereviewgraph",
         version="0.1.0"
+    )
+
+
+@router.post("/api/auth/google", response_model=UserProfile)
+def auth_google(request: GoogleAuthRequest):
+    """Authenticate or verify Google authentication session."""
+    user_id = str(uuid.uuid4())[:8]
+    return UserProfile(
+        id=user_id,
+        email=request.email or "developer@gmail.com",
+        name=request.name or "Developer",
+        picture=request.picture or "/static/avatar.png",
+        provider="google",
+        authenticated=True
+    )
+
+
+@router.get("/api/auth/me", response_model=UserProfile)
+def auth_me():
+    """Return default session profile for testing or client verification."""
+    return UserProfile(
+        id="demo-user",
+        email="developer@gmail.com",
+        name="Developer",
+        picture="/static/avatar.png",
+        provider="google",
+        authenticated=True
     )
 
 

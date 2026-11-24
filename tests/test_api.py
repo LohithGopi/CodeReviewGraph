@@ -65,3 +65,24 @@ def test_api_get_run_checkpoint():
     data = response.json()
     assert data["thread_id"] == thread_id
     assert "values" in data
+
+
+def test_api_auth_google():
+    response = client.post("/api/auth/google", json={
+        "email": "alex.test@gmail.com",
+        "name": "Alex Test"
+    })
+    assert response.status_code == 200
+    data = response.json()
+    assert data["email"] == "alex.test@gmail.com"
+    assert data["name"] == "Alex Test"
+    assert data["provider"] == "google"
+    assert data["authenticated"] is True
+
+
+def test_api_auth_me():
+    response = client.get("/api/auth/me")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["authenticated"] is True
+    assert data["provider"] == "google"
