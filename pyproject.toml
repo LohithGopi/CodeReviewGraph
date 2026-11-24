@@ -31,6 +31,9 @@ gemini = [
 [project.scripts]
 codereviewgraph = "codereviewgraph.cli:main"
 
+[tool.setuptools.packages.find]
+include = ["codereviewgraph*"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
