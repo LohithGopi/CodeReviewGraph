@@ -118,7 +118,9 @@ def test_playground_page_route():
 def test_homepage_has_verification_meta_tag():
     response = client.get("/")
     assert response.status_code == 200
+    assert "vGChJq6PAqIH9U9jQjgympLS9HcqrjiK5-qKtXTmXbM" in response.text
     assert "N4cEXw-VrIJLTZ4v6bZ4_ODNjIvmM1Rk7HOqOWTXIaU" in response.text
+
 
 
 

@@ -14,6 +14,7 @@ FALLBACK_HTML = """<!DOCTYPE html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="google-site-verification" content="vGChJq6PAqIH9U9jQjgympLS9HcqrjiK5-qKtXTmXbM" />
   <meta name="google-site-verification" content="N4cEXw-VrIJLTZ4v6bZ4_ODNjIvmM1Rk7HOqOWTXIaU" />
   <meta name="google-site-verification" content="google280d8fb78c0e8560" />
   <title>CodeReviewGraph — Multi-Agent Code Review & Governance</title>
