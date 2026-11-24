@@ -1,0 +1,3 @@
+recursive-include codereviewgraph/static *
+recursive-include public *
+include google280d8fb78c0e8560.html

@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="google-site-verification" content="N4cEXw-VrIJLTZ4v6bZ4_ODNjIvmM1Rk7HOqOWTXIaU" />
+  <meta name="google-site-verification" content="google280d8fb78c0e8560" />
+  <title>CodeReviewGraph — Multi-Agent Code Review & Governance</title>
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+  <link rel="alternate icon" type="image/png" href="/static/logo.png">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600&family=JetBrains+Mono:wght@400;500;600&display=swap');
+    body { font-family: 'Plus Jakarta Sans', sans-serif; }
+    pre, code, textarea, .font-mono { font-family: 'JetBrains Mono', monospace; }
+
+    /* Notched ticket border styling for connected metric cards */
+    .notched-card {
+      position: relative;
+    }
+    .notched-card::before, .notched-card::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 14px;
+      height: 14px;
+      border-radius: 9999px;
+      background-color: #fafaf9;
+      border: 1px solid rgba(229, 231, 235, 0.8);
+      z-index: 10;
+    }
+    .notched-card::before { left: -7px; }
+    .notched-card::after { right: -7px; }
+
+    /* Frosted glass utility */
+    .glass-card {
+      background: rgba(255, 255, 255, 0.82);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.7);
+    }
+  </style>
+</head>
+<body class="bg-[#fafaf9] text-[#1c1d1a] min-h-screen flex flex-col antialiased selection:bg-[#a8c242]/30">
+
+  <!-- Floating Pill Navbar -->
+  <div class="fixed top-5 left-0 right-0 z-50 flex justify-center px-4">
+    <header class="glass-card shadow-sm shadow-black/5 rounded-full px-5 py-2.5 flex items-center justify-between gap-6 max-w-4xl w-full border border-stone-200/60">
+      
+      <!-- Brand -->
+      <a href="/" class="flex items-center space-x-2.5 group">
+        <img src="/static/logo.svg" onerror="this.src='/static/logo.png'" alt="CodeReviewGraph Logo" class="w-7 h-7 rounded-lg object-contain shadow-xs group-hover:scale-105 transition-transform">
+        <span class="text-sm font-semibold tracking-tight text-[#1c1d1a] group-hover:text-[#2d3f18] transition-colors">codereviewgraph</span>
+      </a>
+
+      <!-- Nav Links -->
+      <nav class="hidden md:flex items-center space-x-6 text-xs font-medium text-stone-600">
+        <a href="#workflow" class="hover:text-stone-900 transition-colors">Workflow</a>
+        <a href="#metrics" class="hover:text-stone-900 transition-colors">Performance</a>
+        <a href="#workstation-preview" class="hover:text-stone-900 transition-colors">Playground</a>
+        <a href="#integrations" class="hover:text-stone-900 transition-colors">Architecture</a>
+      </nav>
+
+      <!-- CTA Action & Auth Controls -->
+      <div class="flex items-center space-x-3">
+        <a href="/docs" target="_blank" class="hidden sm:inline-block text-xs font-medium text-stone-500 hover:text-stone-800 transition-colors">API Docs</a>
+        
+        <!-- Logged Out Link (Direct Navigation to /login) -->
+        <a id="nav-login-link" href="/login" class="px-4 py-1.5 rounded-full text-xs font-semibold bg-[#2d3f18] hover:bg-[#202e11] text-[#f7f9f0] shadow-sm transition-all duration-150 flex items-center gap-1.5">
+          <span>Sign In</span>
+        </a>
+
+        <!-- Logged In User Pill -->
+        <div id="nav-user-pill" class="hidden items-center space-x-2">
+          <a href="/playground" class="flex items-center space-x-2 pl-1 pr-3 py-1 rounded-full bg-stone-100 border border-stone-200 text-xs hover:border-[#a8c242] transition">
+            <div class="relative">
+              <img id="nav-user-img" src="/static/avatar.png" alt="User" class="w-6 h-6 rounded-full object-cover border border-stone-300">
+              <span class="absolute bottom-0 right-0 w-2 h-2 bg-emerald-500 border-2 border-white rounded-full"></span>
+            </div>
+            <span id="nav-user-name" class="font-medium text-stone-800 max-w-[120px] truncate">Developer</span>
+            <span class="text-[10px] text-[#3e5517] font-semibold">&rarr;</span>
+          </a>
+          <button onclick="handleSignOut()" class="text-[11px] font-mono text-stone-500 hover:text-rose-600 px-2 py-1 rounded-md transition-colors" title="Sign Out">
+            Sign Out
+          </button>
+        </div>
+      </div>
+
+    </header>
+  </div>
+
+  <!-- Hero Section -->
+  <section class="relative pt-32 pb-20 px-6 overflow-hidden flex flex-col items-center text-center">
+    
+    <!-- Hero Background Art (Subtle Mountain Landscape Motif) -->
+    <div class="absolute inset-0 pointer-events-none opacity-45 -z-10 flex items-center justify-center overflow-hidden">
+      <svg class="w-full max-w-6xl h-auto" viewBox="0 0 1200 600" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M0 600L150 420L320 510L490 340L650 460L830 300L1020 480L1200 370V600H0Z" fill="url(#mountainGrad1)" fill-opacity="0.25"/>
+        <path d="M0 600L220 460L390 530L560 390L740 500L950 360L1200 520V600H0Z" fill="url(#mountainGrad2)" fill-opacity="0.35"/>
+        <circle cx="950" cy="180" r="140" fill="#a8c242" fill-opacity="0.12" filter="blur(40px)"/>
+        <defs>
+          <linearGradient id="mountainGrad1" x1="600" y1="300" x2="600" y2="600" gradientUnits="userSpaceOnUse">
+            <stop stop-color="#a8c242" stop-opacity="0.8"/>
+            <stop offset="1" stop-color="#fafaf9" stop-opacity="0"/>
+          </linearGradient>
+          <linearGradient id="mountainGrad2" x1="600" y1="360" x2="600" y2="600" gradientUnits="userSpaceOnUse">
+            <stop stop-color="#3e5517" stop-opacity="0.6"/>
+            <stop offset="1" stop-color="#fafaf9" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+      </svg>
+    </div>
+
+    <!-- Hero Content -->
+    <div class="max-w-3xl mx-auto space-y-6">
+      
+      <!-- Top Pill Tag -->
+      <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-[#eef3db] border border-[#d6e3a8] text-xs font-medium text-[#2d3f18]">
+        <span class="w-1.5 h-1.5 rounded-full bg-[#6a8b1c]"></span>
+        <span>Deterministic Multi-Agent Governance</span>
+      </div>
+
+      <!-- Agentix-Style Headline with Italic Accent -->
+      <h1 class="text-4xl sm:text-6xl font-semibold tracking-[-0.03em] text-[#1c1d1a] leading-[1.08]">
+        Measure the code quality<br>
+        of every <span class="italic font-normal text-[#3e5517]">AI commit.</span>
+      </h1>
+
+      <p class="text-base sm:text-lg text-stone-600 max-w-xl mx-auto font-normal leading-relaxed">
+        A stateful review pipeline powered by LangGraph. Catches injection flaws, evaluates architecture, and generates automated remediation patches before code hits main.
+      </p>
+
+      <div class="pt-2 flex flex-wrap items-center justify-center gap-3">
+        <a id="hero-primary-cta" href="/login" class="px-6 py-3 rounded-full text-sm font-semibold bg-[#2d3f18] hover:bg-[#1e2b10] text-[#f7f9f0] shadow-md shadow-[#2d3f18]/15 transition-all flex items-center gap-2">
+          <span>Launch Live Playground</span>
+          <span>&rarr;</span>
+        </a>
+        <a href="/login" class="px-5 py-3 rounded-full text-sm font-medium bg-white hover:bg-stone-50 text-stone-700 border border-stone-200 shadow-xs transition-all flex items-center gap-2">
+          <!-- Google 4-color SVG icon -->
+          <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+            <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.65v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.14z"/>
+            <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.26v3.15C3.27 21.36 7.34 24 12 24z"/>
+            <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.26C.46 8.16 0 9.94 0 12s.46 3.84 1.26 5.42l4.02-3.15z"/>
+            <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.34 0 3.27 2.64 1.26 6.58l4.02 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
+          </svg>
+          <span>Sign in with Google</span>
+        </a>
+        <a href="#workflow" class="px-4 py-3 text-xs font-semibold text-stone-500 hover:text-stone-800 transition">
+          Inspect Architecture &darr;
+        </a>
+      </div>
+
+    </div>
+
+    <!-- Floating Agent Isometric Node Cards (Hero Visual) -->
+    <div id="features" class="mt-14 w-full max-w-4xl relative">
+      <div class="glass-card rounded-2xl p-4 shadow-xl shadow-stone-900/5 border border-stone-200/80 grid grid-cols-1 md:grid-cols-3 gap-3 text-left">
+        
+        <div class="p-3.5 rounded-xl bg-white/70 border border-stone-200/60 shadow-xs space-y-2">
+          <div class="flex items-center justify-between text-xs">
+            <span class="font-mono text-stone-500 font-medium">01 · Triage</span>
+            <span class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-[#eef3db] text-[#3e5517]">AST verified</span>
+          </div>
+          <p class="text-xs font-semibold text-stone-800">Syntax & Structural Parser</p>
+          <p class="text-[11px] text-stone-500 leading-normal">Parses abstract syntax tree, extracts imports, and plans audit tasks.</p>
+        </div>
+
+        <div class="p-3.5 rounded-xl bg-white/70 border border-stone-200/60 shadow-xs space-y-2">
+          <div class="flex items-center justify-between text-xs">
+            <span class="font-mono text-stone-500 font-medium">02 · Security</span>
+            <span class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-rose-50 text-rose-700">OWASP scan</span>
+          </div>
+          <p class="text-xs font-semibold text-stone-800">Injection & Credential Sentinel</p>
+          <p class="text-[11px] text-stone-500 leading-normal">Intercepts SQLi, unsafe subprocesses, and unredacted secrets.</p>
+        </div>
+
+        <div class="p-3.5 rounded-xl bg-white/70 border border-stone-200/60 shadow-xs space-y-2">
+          <div class="flex items-center justify-between text-xs">
+            <span class="font-mono text-stone-500 font-medium">03 · Critic</span>
+            <span class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-amber-50 text-amber-800">Auto patch</span>
+          </div>
+          <p class="text-xs font-semibold text-stone-800">Reflection & Patch Advisor</p>
+          <p class="text-[11px] text-stone-500 leading-normal">Eliminates false positives and writes drop-in remediation patches.</p>
+        </div>
+
+      </div>
+    </div>
+
+  </section>
+
+  <!-- Connected Metric Ticket Cards (Agentix Notched Aesthetic) -->
+  <section id="metrics" class="py-12 px-6 max-w-6xl mx-auto w-full">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-0 border border-stone-200 bg-white rounded-2xl overflow-hidden shadow-xs">
+      
+      <div class="notched-card p-6 border-b sm:border-b-0 sm:border-r border-stone-200 flex flex-col justify-between space-y-3">
+        <span class="text-xs font-medium text-stone-500">Deterministic Engine</span>
+        <div>
+          <span class="text-3xl font-semibold tracking-tight text-[#1c1d1a] tabular-nums">100%</span>
+          <p class="text-xs text-stone-500 mt-1">Zero flake offline mock provider</p>
+        </div>
+      </div>
+
+      <div class="notched-card p-6 border-b sm:border-b-0 sm:border-r border-stone-200 flex flex-col justify-between space-y-3">
+        <span class="text-xs font-medium text-stone-500">AST Parse Overhead</span>
+        <div>
+          <span class="text-3xl font-semibold tracking-tight text-[#1c1d1a] tabular-nums">0.4s</span>
+          <p class="text-xs text-stone-500 mt-1">Instant structural triage</p>
+        </div>
+      </div>
+
+      <div class="notched-card p-6 border-b sm:border-b-0 sm:border-r border-stone-200 flex flex-col justify-between space-y-3">
+        <span class="text-xs font-medium text-stone-500">Multi-Agent Reflection</span>
+        <div>
+          <span class="text-3xl font-semibold tracking-tight text-[#1c1d1a] tabular-nums">4-Node</span>
+          <p class="text-xs text-stone-500 mt-1">Planner, Security, Quality, Critic</p>
+        </div>
+      </div>
+
+      <div class="notched-card p-6 flex flex-col justify-between space-y-3">
+        <span class="text-xs font-medium text-stone-500">Autonomous Patching</span>
+        <div>
+          <span class="text-3xl font-semibold tracking-tight text-[#1c1d1a] tabular-nums">0 False +</span>
+          <p class="text-xs text-stone-500 mt-1">Verified unified diff generation</p>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- Narrative Workflow Section (Story-Led 1, 2, 3) -->
+  <section id="workflow" class="py-16 px-6 max-w-6xl mx-auto w-full">
+    <div class="text-center max-w-2xl mx-auto mb-12 space-y-2">
+      <span class="text-xs font-semibold text-[#3e5517] uppercase tracking-wider">State Machine Architecture</span>
+      <h2 class="text-3xl font-semibold tracking-tight text-[#1c1d1a]">People step in only when it matters.</h2>
+      <p class="text-sm text-stone-600">Deterministic rules execute instantly; human reviewers are engaged only at configured risk gates.</p>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      
+      <div class="bg-white rounded-2xl p-6 border border-stone-200 shadow-xs space-y-4">
+        <span class="text-3xl font-mono font-bold text-[#a8c242]">01</span>
+        <h3 class="text-base font-semibold text-stone-900">Syntax & Triage</h3>
+        <p class="text-xs text-stone-600 leading-relaxed">
+          Deconstructs the Python abstract syntax tree (AST) into isolated functions, classes, and import statements without executing untrusted code.
+        </p>
+      </div>
+
+      <div class="bg-white rounded-2xl p-6 border border-stone-200 shadow-xs space-y-4">
+        <span class="text-3xl font-mono font-bold text-[#3e5517]">02</span>
+        <h3 class="text-base font-semibold text-stone-900">Dual-Agent Inspection</h3>
+        <p class="text-xs text-stone-600 leading-relaxed">
+          Two specialized agents run in parallel: Security Auditor flags injection vulnerabilities and credentials; Quality Auditor inspects complexity and style.
+        </p>
+      </div>
+
+      <div class="bg-white rounded-2xl p-6 border border-stone-200 shadow-xs space-y-4">
+        <span class="text-3xl font-mono font-bold text-[#a8c242]">03</span>
+        <h3 class="text-base font-semibold text-stone-900">Reflection & Remediation</h3>
+        <p class="text-xs text-stone-600 leading-relaxed">
+          The Reflection Critic filters false positives, calculates severity scores, and routes severe flaws to an automated patch generator for safe diffing.
+        </p>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- Workstation Preview Banner -->
+  <section id="workstation-preview" class="py-12 px-6 max-w-6xl mx-auto w-full">
+    <div class="rounded-3xl border border-[#d6e3a8] bg-[#f7f9ee] p-8 sm:p-12 text-center space-y-6">
+      <div class="w-14 h-14 mx-auto rounded-2xl bg-white border border-[#d6e3a8] flex items-center justify-center shadow-xs">
+        <img src="/static/logo.svg" onerror="this.src='/static/logo.png'" alt="CodeReviewGraph" class="w-9 h-9">
+      </div>
+      <div class="space-y-2 max-w-xl mx-auto">
+        <h2 class="text-2xl sm:text-3xl font-bold tracking-tight text-stone-900">Ready to test code in the live sandbox?</h2>
+        <p class="text-xs sm:text-sm text-stone-600 leading-relaxed">
+          Sign in to access the multi-agent code workstation: paste code, choose injection presets, inspect real-time AST graphs, and export remediation patches.
+        </p>
+      </div>
+      <div class="flex flex-wrap items-center justify-center gap-3 pt-2">
+        <a id="banner-cta-btn" href="/login" class="px-6 py-3 rounded-full text-xs sm:text-sm font-semibold bg-[#2d3f18] hover:bg-[#1a260e] text-[#f7f9f0] shadow-sm transition">
+          Open Live Playground &rarr;
+        </a>
+        <a href="/login" class="px-5 py-3 rounded-full text-xs sm:text-sm font-medium bg-white hover:bg-stone-50 text-stone-700 border border-stone-200 transition flex items-center gap-2">
+          <!-- Google 4-color SVG icon -->
+          <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+            <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.65v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.14z"/>
+            <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.26v3.15C3.27 21.36 7.34 24 12 24z"/>
+            <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.26C.46 8.16 0 9.94 0 12s.46 3.84 1.26 5.42l4.02-3.15z"/>
+            <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.34 0 3.27 2.64 1.26 6.58l4.02 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
+          </svg>
+          <span>Continue with Google</span>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Supported Ecosystem Dock -->
+  <section id="integrations" class="py-10 px-6 max-w-4xl mx-auto w-full text-center">
+    <span class="text-xs font-semibold text-stone-400 uppercase tracking-wider block mb-4">Supported Architecture</span>
+    <div class="glass-card rounded-full px-6 py-3 border border-stone-200 flex flex-wrap items-center justify-center gap-6 text-xs font-medium text-stone-600">
+      <span>Python 3.13</span>
+      <span class="text-stone-300">·</span>
+      <span>LangGraph 1.2</span>
+      <span class="text-stone-300">·</span>
+      <span>LangChain Core</span>
+      <span class="text-stone-300">·</span>
+      <span>FastAPI</span>
+      <span class="text-stone-300">·</span>
+      <span>SQLite Checkpointing</span>
+      <span class="text-stone-300">·</span>
+      <span>Pytest Gated</span>
+    </div>
+  </section>
+
+  <!-- Full-Width Chartreuse / Olive Footer -->
+  <footer class="mt-20 bg-[#a8c242] text-[#1e2b10] px-6 py-14">
+    <div class="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6 border-b border-[#2d3f18]/15 pb-10">
+      <div class="flex items-center space-x-3 text-center md:text-left">
+        <img src="/static/logo.svg" onerror="this.src='/static/logo.png'" alt="CodeReviewGraph" class="w-10 h-10 rounded-xl shadow-xs">
+        <div>
+          <h3 class="text-2xl font-bold tracking-tight text-[#1e2b10]">CodeReviewGraph</h3>
+          <p class="text-xs font-medium text-[#2d3f18]/80">Autonomous code governance for engineering teams.</p>
+        </div>
+      </div>
+      <div class="flex items-center space-x-4">
+        <span class="font-mono text-xs bg-[#2d3f18]/10 px-3 py-1.5 rounded-full border border-[#2d3f18]/20">
+          py -m codereviewgraph.cli audit
+        </span>
+        <a href="/login" class="px-4 py-2 rounded-full text-xs font-semibold bg-[#2d3f18] hover:bg-[#1a260e] text-[#f7f9f0] shadow-sm transition">
+          Sign In
+        </a>
+      </div>
+    </div>
+    <div class="max-w-6xl mx-auto pt-6 flex flex-col sm:flex-row items-center justify-between text-xs text-[#2d3f18]/70 gap-3">
+      <span>Local-first architecture · Windows 10/11 · Headless &amp; Dashboard</span>
+      <span>Built in accordance with AutoDev Factory Lifecycle</span>
+    </div>
+  </footer>
+
+  <!-- Client Auth State Checker -->
+  <script>
+    (function checkAuthState() {
+      try {
+        const raw = localStorage.getItem('crg_auth_user');
+        if (!raw) return;
+        const user = JSON.parse(raw);
+        if (user && user.authenticated) {
+          // Update navbar
+          document.getElementById('nav-login-link')?.classList.add('hidden');
+          const pill = document.getElementById('nav-user-pill');
+          if (pill) {
+            pill.classList.remove('hidden');
+            pill.classList.add('flex');
+          }
+          if (user.name) document.getElementById('nav-user-name').innerText = user.name;
+          if (user.picture) document.getElementById('nav-user-img').src = user.picture;
+
+          // Update CTAs to point straight to /playground
+          const heroCta = document.getElementById('hero-primary-cta');
+          if (heroCta) {
+            heroCta.href = '/playground';
+            heroCta.innerHTML = '<span>Open Live Workstation</span><span>&rarr;</span>';
+          }
+          const bannerCta = document.getElementById('banner-cta-btn');
+          if (bannerCta) {
+            bannerCta.href = '/playground';
+            bannerCta.innerHTML = 'Open Live Workstation &rarr;';
+          }
+        }
+      } catch (e) {}
+    })();
+
+    function handleSignOut() {
+      localStorage.removeItem('crg_auth_user');
+      window.location.reload();
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="google-site-verification" content="N4cEXw-VrIJLTZ4v6bZ4_ODNjIvmM1Rk7HOqOWTXIaU" />
+  <meta name="google-site-verification" content="google280d8fb78c0e8560" />
+  <title>Live Code Playground — CodeReviewGraph</title>
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+  <link rel="alternate icon" type="image/png" href="/static/logo.png">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+    body { font-family: 'Plus Jakarta Sans', sans-serif; }
+    pre, code, textarea, .font-mono { font-family: 'JetBrains Mono', monospace; }
+  </style>
+</head>
+<body class="bg-[#fafaf9] text-[#1c1d1a] min-h-screen flex flex-col antialiased selection:bg-[#a8c242]/30">
+
+  <!-- Auth Gate Check (Client Side) -->
+  <script>
+    (function requireAuth() {
+      try {
+        const raw = localStorage.getItem('crg_auth_user');
+        if (!raw) {
+          window.location.href = '/login';
+          return;
+        }
+        const user = JSON.parse(raw);
+        if (!user || !user.authenticated) {
+          window.location.href = '/login';
+        }
+      } catch (e) {
+        window.location.href = '/login';
+      }
+    })();
+  </script>
+
+  <!-- Navigation Bar -->
+  <header class="border-b border-stone-200/80 bg-white/80 backdrop-blur-md sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+      
+      <!-- Brand & Section Tag -->
+      <div class="flex items-center space-x-4">
+        <a href="/" class="flex items-center space-x-2.5 group">
+          <img src="/static/logo.svg" onerror="this.src='/static/logo.png'" alt="CodeReviewGraph" class="w-7 h-7 rounded-lg object-contain shadow-xs group-hover:scale-105 transition-transform">
+          <span class="text-sm font-semibold tracking-tight text-[#1c1d1a] group-hover:text-[#2d3f18] transition-colors">codereviewgraph</span>
+        </a>
+        <span class="text-stone-300">/</span>
+        <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-mono font-medium bg-[#eef3db] text-[#2d3f18] border border-[#d6e3a8]">
+          <span class="w-1.5 h-1.5 rounded-full bg-[#6a8b1c]"></span>
+          <span>Live Workstation</span>
+        </span>
+      </div>
+
+      <!-- Right Controls -->
+      <div class="flex items-center space-x-4">
+        <a href="/docs" target="_blank" class="hidden sm:inline-block text-xs font-medium text-stone-500 hover:text-stone-800 transition">
+          API Docs &rarr;
+        </a>
+
+        <!-- User Profile Pill -->
+        <div class="flex items-center space-x-2 pl-1 pr-3 py-1 rounded-full bg-stone-100 border border-stone-200 text-xs">
+          <div class="relative">
+            <img id="user-avatar-img" src="/static/avatar.png" class="w-6 h-6 rounded-full object-cover border border-stone-300">
+            <span class="absolute bottom-0 right-0 w-2 h-2 bg-emerald-500 border-2 border-white rounded-full"></span>
+          </div>
+          <div class="flex flex-col text-left">
+            <span id="user-display-name" class="font-semibold text-stone-800 max-w-[120px] truncate leading-tight">Developer</span>
+            <span id="user-display-email" class="text-[10px] font-mono text-stone-500 max-w-[120px] truncate leading-tight">user@gmail.com</span>
+          </div>
+        </div>
+
+        <button onclick="handleSignOut()" class="text-xs font-medium text-stone-500 hover:text-rose-600 transition px-2 py-1 rounded-lg">
+          Sign Out
+        </button>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- Workstation Container -->
+  <main class="flex-1 max-w-7xl mx-auto w-full px-6 py-8 space-y-6">
+
+    <!-- Top Description Banner -->
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-2 border-b border-stone-200">
+      <div>
+        <h1 class="text-2xl font-bold tracking-tight text-[#1c1d1a]">Stateful Multi-Agent Review Playground</h1>
+        <p class="text-xs text-stone-500 mt-1">
+          Executes LangGraph deterministic auditing: Abstract Syntax Tree parsing, OWASP security scanning, and automated patch creation.
+        </p>
+      </div>
+      <div class="flex items-center gap-2">
+        <a href="/" class="px-3.5 py-1.5 rounded-xl border border-stone-200 bg-white hover:bg-stone-50 text-xs font-medium text-stone-700 transition shadow-xs">
+          &larr; Landing Page
+        </a>
+      </div>
+    </div>
+
+    <!-- Playground Workstation Card -->
+    <div class="bg-white rounded-2xl border border-stone-200 shadow-lg shadow-stone-900/5 overflow-hidden">
+      
+      <!-- Pipeline Status Ribbon -->
+      <div class="bg-[#f5f6f2] border-b border-stone-200 px-6 py-3 flex items-center justify-between overflow-x-auto text-xs">
+        <div class="flex items-center space-x-2 min-w-max">
+          <span class="text-[11px] font-semibold text-stone-500 uppercase tracking-wider">Graph Status:</span>
+          <span id="step-planner" class="px-2.5 py-1 rounded-md text-[11px] font-mono bg-white text-stone-700 border border-stone-200 transition-all">1. Planner</span>
+          <span class="text-stone-300">&rarr;</span>
+          <span id="step-security" class="px-2.5 py-1 rounded-md text-[11px] font-mono bg-white text-stone-700 border border-stone-200 transition-all">2. Security</span>
+          <span class="text-stone-300">&rarr;</span>
+          <span id="step-quality" class="px-2.5 py-1 rounded-md text-[11px] font-mono bg-white text-stone-700 border border-stone-200 transition-all">3. Quality</span>
+          <span class="text-stone-300">&rarr;</span>
+          <span id="step-critic" class="px-2.5 py-1 rounded-md text-[11px] font-mono bg-white text-stone-700 border border-stone-200 transition-all">4. Critic</span>
+          <span class="text-stone-300">&rarr;</span>
+          <span id="step-refactor" class="px-2.5 py-1 rounded-md text-[11px] font-mono bg-white text-stone-700 border border-stone-200 transition-all">5. Patch</span>
+          <span class="text-stone-300">&rarr;</span>
+          <span id="step-reporter" class="px-2.5 py-1 rounded-md text-[11px] font-mono bg-white text-stone-700 border border-stone-200 transition-all">6. Report</span>
+        </div>
+        <div id="thread-id-indicator" class="hidden font-mono text-[11px] text-stone-500 pl-4">
+          ID: <span id="current-thread" class="font-semibold text-stone-800"></span>
+        </div>
+      </div>
+
+      <!-- Playground Grid -->
+      <div class="p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        <!-- Left: Code Editor -->
+        <div class="lg:col-span-6 flex flex-col space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold text-stone-700">Source Editor</span>
+            <div class="flex items-center space-x-1">
+              <span class="text-[11px] text-stone-400 mr-1">Presets:</span>
+              <button onclick="loadPreset('clean')" class="px-2 py-0.5 rounded text-xs bg-stone-100 hover:bg-stone-200 text-stone-700 border border-stone-200 transition">Clean</button>
+              <button onclick="loadPreset('sqli')" class="px-2 py-0.5 rounded text-xs bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition">SQLi</button>
+              <button onclick="loadPreset('cmd')" class="px-2 py-0.5 rounded text-xs bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 transition">Subprocess</button>
+              <button onclick="loadPreset('syntax')" class="px-2 py-0.5 rounded text-xs bg-stone-100 hover:bg-stone-200 text-stone-700 border border-stone-200 transition">Syntax</button>
+            </div>
+          </div>
+
+          <div class="rounded-xl border border-stone-200 bg-[#161719] flex flex-col overflow-hidden shadow-inner flex-1 min-h-[420px]">
+            <div class="h-8 border-b border-stone-800 px-3 flex items-center justify-between text-[11px] font-mono text-stone-400 bg-[#0f1012]">
+              <span>module.py</span>
+              <span id="line-count" class="tabular-nums">0 lines</span>
+            </div>
+            <textarea 
+              id="code-input" 
+              oninput="updateLineCount()"
+              class="w-full flex-1 bg-transparent p-4 text-xs font-mono text-[#f3f4f6] outline-none resize-none leading-relaxed" 
+              spellcheck="false" 
+              placeholder="# Paste or type Python code here..."></textarea>
+          </div>
+
+          <button 
+            id="run-btn" 
+            onclick="runAudit()" 
+            class="w-full h-11 rounded-xl text-xs font-semibold bg-[#2d3f18] hover:bg-[#1f2d10] text-[#f7f9f0] shadow-sm flex items-center justify-center space-x-2 transition-all active:scale-[0.99]">
+            <span id="btn-spinner" class="hidden w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+            <span id="btn-text">Audit Code via LangGraph</span>
+          </button>
+        </div>
+
+        <!-- Right: Results Feed -->
+        <div class="lg:col-span-6 flex flex-col space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-semibold text-stone-700">Audit Telemetry</span>
+            <button id="download-btn" onclick="downloadReport()" class="hidden text-xs text-[#2d3f18] hover:underline flex items-center gap-1 font-medium">
+              Export Markdown &darr;
+            </button>
+          </div>
+
+          <!-- Empty State -->
+          <div id="results-placeholder" class="rounded-xl border border-dashed border-stone-200 bg-stone-50/50 p-8 flex-1 min-h-[420px] flex flex-col items-center justify-center text-center text-stone-500 space-y-2">
+            <div class="w-10 h-10 rounded-full bg-stone-100 flex items-center justify-center text-stone-400">
+              <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+            </div>
+            <p class="text-xs">Click "Audit Code" to run the multi-agent graph inspection.</p>
+          </div>
+
+          <!-- Active Results -->
+          <div id="results-container" class="hidden flex-1 flex flex-col space-y-3">
+            
+            <!-- Health Score Bar -->
+            <div class="rounded-xl border border-stone-200 bg-[#fbfcf8] p-4 flex items-center justify-between">
+              <div class="flex items-center space-x-3.5">
+                <div class="relative shrink-0">
+                  <img src="/static/avatar.png" onerror="this.src='/static/avatar.svg'" alt="AI Auditor" class="w-10 h-10 rounded-full border border-stone-200 object-cover shadow-xs bg-stone-900">
+                  <span class="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-white rounded-full"></span>
+                </div>
+                <div>
+                  <span class="text-[11px] font-medium text-stone-500">Health Score</span>
+                  <div class="flex items-baseline space-x-2">
+                    <span id="score-val" class="text-2xl font-bold tracking-tight text-stone-900">--</span>
+                    <span id="status-badge" class="px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider"></span>
+                  </div>
+                </div>
+              </div>
+              <div class="text-right">
+                <span class="text-[11px] font-medium text-stone-500">Execution Time</span>
+                <p id="exec-time" class="text-sm font-semibold text-stone-800 tabular-nums">--</p>
+              </div>
+            </div>
+
+            <!-- Tab Switcher -->
+            <div class="flex border-b border-stone-200 text-xs">
+              <button id="tab-btn-findings" onclick="switchTab('findings')" class="px-4 py-2 border-b-2 border-[#2d3f18] font-semibold text-[#2d3f18]">Findings (<span id="findings-count">0</span>)</button>
+              <button id="tab-btn-patch" onclick="switchTab('patch')" class="px-4 py-2 border-b-2 border-transparent font-medium text-stone-500 hover:text-stone-700">Unified Patch</button>
+              <button id="tab-btn-ast" onclick="switchTab('ast')" class="px-4 py-2 border-b-2 border-transparent font-medium text-stone-500 hover:text-stone-700">AST Graph</button>
+            </div>
+
+            <!-- Tab 1: Findings List -->
+            <div id="tab-findings" class="flex-1 overflow-y-auto max-h-[300px] space-y-2 pr-1">
+              <div id="findings-list" class="space-y-2"></div>
+            </div>
+
+            <!-- Tab 2: Diff / Patch Viewer -->
+            <div id="tab-patch" class="hidden flex-1 overflow-hidden flex flex-col rounded-xl border border-stone-200 bg-[#161719]">
+              <div class="h-8 border-b border-stone-800 px-3 flex items-center justify-between text-[11px] font-mono text-stone-400 bg-[#0f1012]">
+                <span>patch.diff</span>
+                <button onclick="copyPatch()" class="hover:text-white transition">Copy Diff</button>
+              </div>
+              <pre id="patch-diff" class="p-3 text-xs font-mono text-emerald-400 overflow-auto flex-1 max-h-[280px] leading-relaxed">No patch generated.</pre>
+            </div>
+
+            <!-- Tab 3: AST Telemetry Viewer -->
+            <div id="tab-ast" class="hidden flex-1 overflow-hidden flex flex-col rounded-xl border border-stone-200 bg-[#161719]">
+              <div class="h-8 border-b border-stone-800 px-3 flex items-center justify-between text-[11px] font-mono text-stone-400 bg-[#0f1012]">
+                <span>ast_telemetry.json</span>
+                <span id="ast-status">Ready</span>
+              </div>
+              <pre id="ast-json" class="p-3 text-xs font-mono text-cyan-300 overflow-auto flex-1 max-h-[280px] leading-relaxed">{}</pre>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+  </main>
+
+  <footer class="border-t border-stone-200 bg-white py-4 text-center text-xs text-stone-500">
+    &copy; 2026 CodeReviewGraph &bull; Stateful Multi-Agent Governance
+  </footer>
+
+  <script>
+    const AUTH_KEY = 'crg_auth_user';
+    let latestMarkdown = "";
+    let latestDiff = "";
+
+    // Sync user profile in UI
+    (function initUserProfile() {
+      try {
+        const raw = localStorage.getItem(AUTH_KEY);
+        if (raw) {
+          const user = JSON.parse(raw);
+          if (user) {
+            document.getElementById('user-display-name').innerText = user.name || 'Developer';
+            document.getElementById('user-display-email').innerText = user.email || 'developer@gmail.com';
+            if (user.picture) {
+              document.getElementById('user-avatar-img').src = user.picture;
+            }
+          }
+        }
+      } catch (e) {}
+    })();
+
+    function handleSignOut() {
+      localStorage.removeItem(AUTH_KEY);
+      window.location.href = '/';
+    }
+
+    const PRESETS = {
+      clean: `def compute_fibonacci(n: int) -> int:
+    """Safely calculates fibonacci numbers with validation."""
+    if n < 0:
+        raise ValueError("Index must be non-negative")
+    if n in (0, 1):
+        return n
+    a, b = 0, 1
+    for _ in range(2, n + 1):
+        a, b = b, a + b
+    return b`,
+      sqli: `import sqlite3
+
+def fetch_user_record(cursor, user_id: str):
+    # Unsafe direct string concatenation vulnerable to SQL injection
+    query = "SELECT * FROM users WHERE id = '" + user_id + "'"
+    cursor.execute(query)
+    return cursor.fetchone()`,
+      cmd: `import subprocess
+
+def run_system_diagnostic(user_host: str):
+    # Unsafe shell=True with user provided argument
+    command = f"ping -c 1 {user_host}"
+    return subprocess.check_output(command, shell=True)`,
+      syntax: `def broken_syntax_example(val)
+    print("Missing colon syntax error"
+    return val * 2`
+    };
+
+    function loadPreset(key) {
+      const textarea = document.getElementById('code-input');
+      if (textarea && PRESETS[key]) {
+        textarea.value = PRESETS[key];
+        updateLineCount();
+      }
+    }
+
+    function updateLineCount() {
+      const textarea = document.getElementById('code-input');
+      const lines = textarea.value ? textarea.value.split('\n').length : 0;
+      document.getElementById('line-count').innerText = `${lines} ${lines === 1 ? 'line' : 'lines'}`;
+    }
+
+    function switchTab(tabId) {
+      ['findings', 'patch', 'ast'].forEach(id => {
+        const panel = document.getElementById(`tab-${id}`);
+        const btn = document.getElementById(`tab-btn-${id}`);
+        if (panel && btn) {
+          if (id === tabId) {
+            panel.classList.remove('hidden');
+            btn.classList.add('border-[#2d3f18]', 'text-[#2d3f18]', 'font-semibold');
+            btn.classList.remove('border-transparent', 'text-stone-500');
+          } else {
+            panel.classList.add('hidden');
+            btn.classList.remove('border-[#2d3f18]', 'text-[#2d3f18]', 'font-semibold');
+            btn.classList.add('border-transparent', 'text-stone-500');
+          }
+        }
+      });
+    }
+
+    function setStepState(stepId, state) {
+      const el = document.getElementById(stepId);
+      if (!el) return;
+      el.className = 'px-2.5 py-1 rounded-md text-[11px] font-mono transition-all';
+      if (state === 'active') {
+        el.className += ' bg-amber-100 text-amber-900 border border-amber-300 animate-pulse';
+      } else if (state === 'done') {
+        el.className += ' bg-emerald-50 text-emerald-800 border border-emerald-300';
+      } else {
+        el.className += ' bg-white text-stone-700 border border-stone-200';
+      }
+    }
+
+    function resetPipelineSteps() {
+      ['step-planner', 'step-security', 'step-quality', 'step-critic', 'step-refactor', 'step-reporter'].forEach(id => {
+        setStepState(id, 'idle');
+      });
+    }
+
+    async function runAudit() {
+      const code = document.getElementById('code-input').value.trim();
+      if (!code) {
+        alert("Please paste or type some Python code into the editor first.");
+        return;
+      }
+
+      const runBtn = document.getElementById('run-btn');
+      const btnSpinner = document.getElementById('btn-spinner');
+      const btnText = document.getElementById('btn-text');
+      const threadIndicator = document.getElementById('thread-id-indicator');
+      const currentThreadEl = document.getElementById('current-thread');
+
+      runBtn.disabled = true;
+      btnSpinner.classList.remove('hidden');
+      btnText.innerText = "Running LangGraph Workflow...";
+      resetPipelineSteps();
+
+      const startTime = performance.now();
+
+      try {
+        setStepState('step-planner', 'active');
+        await new Promise(r => setTimeout(r, 120));
+        setStepState('step-planner', 'done');
+        setStepState('step-security', 'active');
+
+        const threadId = 'run-' + Math.random().toString(36).substring(2, 9);
+        const res = await fetch('/api/audit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: code, language: 'python', thread_id: threadId })
+        });
+
+        if (!res.ok) throw new Error("API call failed with status " + res.status);
+        const data = await res.json();
+
+        setStepState('step-security', 'done');
+        setStepState('step-quality', 'done');
+        setStepState('step-critic', 'done');
+        setStepState('step-refactor', 'done');
+        setStepState('step-reporter', 'done');
+
+        const elapsed = ((performance.now() - startTime) / 1000).toFixed(2);
+        document.getElementById('exec-time').innerText = `${elapsed}s`;
+
+        if (currentThreadEl) currentThreadEl.innerText = data.thread_id || threadId;
+        if (threadIndicator) threadIndicator.classList.remove('hidden');
+
+        renderReport(data.report);
+
+      } catch (err) {
+        console.error(err);
+        alert("Execution Error: " + err.message);
+        resetPipelineSteps();
+      } finally {
+        runBtn.disabled = false;
+        btnSpinner.classList.add('hidden');
+        btnText.innerText = "Audit Code via LangGraph";
+      }
+    }
+
+    function renderReport(report) {
+      if (!report) return;
+
+      document.getElementById('results-placeholder').classList.add('hidden');
+      document.getElementById('results-container').classList.remove('hidden');
+      document.getElementById('download-btn').classList.remove('hidden');
+
+      const scoreVal = document.getElementById('score-val');
+      const statusBadge = document.getElementById('status-badge');
+      scoreVal.innerText = report.score + '/100';
+
+      if (report.score >= 80) {
+        statusBadge.innerText = 'PASS';
+        statusBadge.className = 'px-2 py-0.5 rounded text-[10px] font-semibold uppercase bg-emerald-100 text-emerald-800';
+      } else if (report.score >= 50) {
+        statusBadge.innerText = 'NEEDS REVIEW';
+        statusBadge.className = 'px-2 py-0.5 rounded text-[10px] font-semibold uppercase bg-amber-100 text-amber-800';
+      } else {
+        statusBadge.innerText = 'FAILED';
+        statusBadge.className = 'px-2 py-0.5 rounded text-[10px] font-semibold uppercase bg-rose-100 text-rose-800';
+      }
+
+      const findings = report.findings || [];
+      document.getElementById('findings-count').innerText = findings.length;
+      const list = document.getElementById('findings-list');
+      list.innerHTML = '';
+
+      if (findings.length === 0) {
+        list.innerHTML = `
+          <div class="p-4 rounded-xl bg-emerald-50/50 border border-emerald-200 text-xs text-emerald-800">
+            <strong>Clean AST Analysis:</strong> No security vulnerabilities or syntax violations detected.
+          </div>`;
+      } else {
+        findings.forEach(f => {
+          const item = document.createElement('div');
+          const isCritical = f.severity === 'critical' || f.severity === 'high';
+          const badgeClass = isCritical ? 'bg-rose-100 text-rose-800 border-rose-200' : 'bg-amber-100 text-amber-800 border-amber-200';
+          item.className = 'p-3 rounded-xl border border-stone-200 bg-white shadow-xs space-y-1.5 text-xs';
+          item.innerHTML = `
+            <div class="flex items-center justify-between">
+              <span class="font-semibold text-stone-900">${escapeHtml(f.title || f.category)}</span>
+              <span class="px-2 py-0.5 rounded text-[10px] font-mono uppercase border ${badgeClass}">${escapeHtml(f.severity)}</span>
+            </div>
+            <p class="text-stone-600">${escapeHtml(f.description)}</p>
+            ${f.line_number ? `<span class="font-mono text-[10px] text-stone-400">Line: ${f.line_number}</span>` : ''}
+          `;
+          list.appendChild(item);
+        });
+      }
+
+      latestDiff = report.diff || "";
+      document.getElementById('patch-diff').innerText = latestDiff || "No patch generated.";
+      document.getElementById('ast-json').innerText = JSON.stringify(report.ast_telemetry || { status: "clean", imports: [] }, null, 2);
+
+      latestMarkdown = `# CodeReviewGraph Audit Report\n\n**Health Score:** ${report.score}/100\n**Status:** ${report.status}\n\n## Findings\n${findings.map(f => `- **[${f.severity.toUpperCase()}]** ${f.title}: ${f.description}`).join('\n')}\n\n## Unified Diff Patch\n\`\`\`diff\n${report.diff || 'No diff'}\n\`\`\``;
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function copyPatch() {
+      if (!latestDiff) return;
+      navigator.clipboard.writeText(latestDiff).then(() => alert("Patch diff copied to clipboard!"));
+    }
+
+    function downloadReport() {
+      if (!latestMarkdown) return;
+      const blob = new Blob([latestMarkdown], { type: 'text/markdown' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = "codereviewgraph-report.md";
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    // Load clean preset by default
+    document.addEventListener('DOMContentLoaded', () => {
+      loadPreset('clean');
+    });
+  </script>
+</body>
+</html>

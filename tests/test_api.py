@@ -115,4 +115,11 @@ def test_playground_page_route():
     assert "Audit Code via LangGraph" in response.text
 
 
+def test_homepage_has_verification_meta_tag():
+    response = client.get("/")
+    assert response.status_code == 200
+    assert "N4cEXw-VrIJLTZ4v6bZ4_ODNjIvmM1Rk7HOqOWTXIaU" in response.text
+
+
+
 

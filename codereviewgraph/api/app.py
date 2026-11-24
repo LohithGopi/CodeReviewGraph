@@ -9,6 +9,37 @@ from codereviewgraph.api.routes import router
 
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 
+FALLBACK_HTML = """<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="google-site-verification" content="N4cEXw-VrIJLTZ4v6bZ4_ODNjIvmM1Rk7HOqOWTXIaU" />
+  <meta name="google-site-verification" content="google280d8fb78c0e8560" />
+  <title>CodeReviewGraph — Multi-Agent Code Review & Governance</title>
+</head>
+<body style="font-family:sans-serif;padding:2rem;text-align:center;">
+  <h1>CodeReviewGraph</h1>
+  <p>Multi-Agent Code Review & Governance Pipeline.</p>
+  <p><a href="/login">Sign In</a> | <a href="/docs">API Documentation</a></p>
+</body>
+</html>"""
+
+
+def find_static_file(filename: str):
+    candidates = [
+        STATIC_DIR / filename,
+        Path.cwd() / "public" / filename,
+        Path.cwd() / "codereviewgraph" / "static" / filename,
+        Path.cwd() / "static" / filename,
+        Path(__file__).resolve().parent.parent / "static" / filename,
+    ]
+    for c in candidates:
+        if c.is_file():
+            return c
+    return None
+
+
 app = FastAPI(
     title="CodeReviewGraph API & Dashboard",
     description="Stateful Multi-Agent Code Auditor & Refactoring Workflow powered by LangGraph & LangChain",
@@ -42,28 +73,35 @@ app.include_router(router)
 @app.get("/", include_in_schema=False)
 def serve_dashboard():
     """Serve the interactive web frontend dashboard."""
-    index_file = STATIC_DIR / "index.html"
-    if index_file.is_file():
+    index_file = find_static_file("index.html")
+    if index_file and index_file.is_file():
         return FileResponse(index_file)
-    return {"message": "CodeReviewGraph API is running. Visit /docs for Swagger UI."}
+    return Response(content=FALLBACK_HTML, media_type="text/html")
 
 
 @app.get("/login", include_in_schema=False)
 def serve_login():
     """Serve the dedicated login authentication page."""
-    login_file = STATIC_DIR / "login.html"
-    if login_file.is_file():
+    login_file = find_static_file("login.html")
+    if login_file and login_file.is_file():
         return FileResponse(login_file)
-    return FileResponse(STATIC_DIR / "index.html")
+    index_file = find_static_file("index.html")
+    if index_file and index_file.is_file():
+        return FileResponse(index_file)
+    return Response(content=FALLBACK_HTML, media_type="text/html")
 
 
 @app.get("/playground", include_in_schema=False)
 def serve_playground():
     """Serve the dedicated live code playground workstation."""
-    playground_file = STATIC_DIR / "playground.html"
-    if playground_file.is_file():
+    playground_file = find_static_file("playground.html")
+    if playground_file and playground_file.is_file():
         return FileResponse(playground_file)
-    return FileResponse(STATIC_DIR / "index.html")
+    index_file = find_static_file("index.html")
+    if index_file and index_file.is_file():
+        return FileResponse(index_file)
+    return Response(content=FALLBACK_HTML, media_type="text/html")
+
 
 
 @app.get("/google280d8fb78c0e8560.html", include_in_schema=False)

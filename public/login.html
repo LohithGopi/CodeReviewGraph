@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="google-site-verification" content="N4cEXw-VrIJLTZ4v6bZ4_ODNjIvmM1Rk7HOqOWTXIaU" />
+  <meta name="google-site-verification" content="google280d8fb78c0e8560" />
+  <title>Sign In — CodeReviewGraph</title>
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+  <link rel="alternate icon" type="image/png" href="/static/logo.png">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Identity Services (GSI) -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+    body { font-family: 'Plus Jakarta Sans', sans-serif; }
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+  </style>
+</head>
+<body class="bg-[#fafaf9] text-[#1c1d1a] min-h-screen flex flex-col justify-between antialiased selection:bg-[#a8c242]/30">
+
+  <!-- Top Minimal Header -->
+  <header class="w-full max-w-5xl mx-auto px-6 py-6 flex items-center justify-between">
+    <a href="/" class="flex items-center space-x-2.5 group">
+      <img src="/static/logo.svg" onerror="this.src='/static/logo.png'" alt="CodeReviewGraph Logo" class="w-7 h-7 rounded-lg object-contain shadow-xs group-hover:scale-105 transition-transform">
+      <span class="text-sm font-semibold tracking-tight text-[#1c1d1a] group-hover:text-[#2d3f18] transition-colors">codereviewgraph</span>
+    </a>
+    <a href="/" class="text-xs font-medium text-stone-500 hover:text-stone-900 transition flex items-center gap-1.5">
+      <span>&larr;</span>
+      <span>Back to Home</span>
+    </a>
+  </header>
+
+  <!-- Main Login Card Container -->
+  <main class="flex-1 flex items-center justify-center px-4 py-8">
+    <div class="bg-white rounded-3xl border border-stone-200/90 shadow-xl shadow-stone-900/5 p-7 sm:p-10 max-w-md w-full relative space-y-6 text-center">
+      
+      <!-- Brand Emblem -->
+      <div class="w-16 h-16 mx-auto rounded-2xl bg-[#f4f7ea] border border-[#d6e3a8] flex items-center justify-center shadow-inner">
+        <img src="/static/logo.svg" onerror="this.src='/static/logo.png'" alt="CodeReviewGraph" class="w-10 h-10">
+      </div>
+
+      <!-- Header -->
+      <div class="space-y-1.5">
+        <h1 class="text-2xl font-bold tracking-tight text-[#1c1d1a]">Sign in to CodeReviewGraph</h1>
+        <p class="text-xs text-stone-500 max-w-xs mx-auto">
+          Authenticate to access the multi-agent code workstation &amp; automated patch generator.
+        </p>
+      </div>
+
+      <!-- Authenticator Card Content -->
+      <div class="space-y-4 text-left">
+        
+        <!-- Continue with Google Button -->
+        <button id="google-signin-btn" onclick="openGoogleAccountChooser()" class="w-full flex items-center justify-center gap-3 px-4 py-3 rounded-xl border border-stone-300 hover:border-stone-400 bg-white hover:bg-stone-50 text-stone-700 text-xs sm:text-sm font-semibold shadow-xs hover:shadow-md transition active:scale-[0.99] group">
+          <!-- Google 4-color SVG icon -->
+          <svg class="w-5 h-5 shrink-0" viewBox="0 0 24 24">
+            <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.65v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.14z"/>
+            <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.26v3.15C3.27 21.36 7.34 24 12 24z"/>
+            <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.26C.46 8.16 0 9.94 0 12s.46 3.84 1.26 5.42l4.02-3.15z"/>
+            <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.34 0 3.27 2.64 1.26 6.58l4.02 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
+          </svg>
+          <span id="google-btn-text">Continue with Google</span>
+        </button>
+
+        <!-- Native GSI Slot (rendered when Client ID is configured) -->
+        <div id="gsi-slot-container" class="flex justify-center empty:hidden"></div>
+
+        <!-- Google Interactive Account Chooser (Shown on Google click) -->
+        <div id="google-account-panel" class="hidden p-3.5 rounded-2xl bg-blue-50/50 border border-blue-200/80 space-y-3 transition-all">
+          <div class="flex items-center justify-between">
+            <span class="text-[11px] font-semibold text-blue-900 uppercase tracking-wider">Choose Google Account</span>
+            <button type="button" onclick="closeGoogleAccountChooser()" class="text-xs text-stone-400 hover:text-stone-700">&times; close</button>
+          </div>
+
+          <!-- Quick Test Accounts -->
+          <div class="space-y-2">
+            <button type="button" onclick="loginWithProfile('alex.rivers.dev@gmail.com', 'Alex Rivers')" class="w-full flex items-center justify-between p-2.5 rounded-xl bg-white border border-stone-200 hover:border-blue-400 hover:shadow-xs transition group">
+              <div class="flex items-center space-x-2.5">
+                <div class="w-8 h-8 rounded-full bg-[#4285F4] text-white font-semibold flex items-center justify-center text-xs">
+                  A
+                </div>
+                <div class="text-left">
+                  <div class="text-xs font-semibold text-stone-900 group-hover:text-blue-700">Alex Rivers</div>
+                  <div class="text-[11px] font-mono text-stone-500">alex.rivers.dev@gmail.com</div>
+                </div>
+              </div>
+              <span class="text-blue-600 text-xs font-semibold">&rarr;</span>
+            </button>
+
+            <button type="button" onclick="loginWithProfile('sarah.chen.security@gmail.com', 'Sarah Chen')" class="w-full flex items-center justify-between p-2.5 rounded-xl bg-white border border-stone-200 hover:border-emerald-400 hover:shadow-xs transition group">
+              <div class="flex items-center space-x-2.5">
+                <div class="w-8 h-8 rounded-full bg-[#34A853] text-white font-semibold flex items-center justify-center text-xs">
+                  S
+                </div>
+                <div class="text-left">
+                  <div class="text-xs font-semibold text-stone-900 group-hover:text-emerald-700">Sarah Chen</div>
+                  <div class="text-[11px] font-mono text-stone-500">sarah.chen.security@gmail.com</div>
+                </div>
+              </div>
+              <span class="text-emerald-600 text-xs font-semibold">&rarr;</span>
+            </button>
+          </div>
+
+          <!-- Use Custom Google Account Toggle -->
+          <div class="pt-1">
+            <button type="button" onclick="toggleCustomGoogleInput()" class="text-[11px] text-blue-700 hover:text-blue-900 font-medium underline underline-offset-2">
+              + Use another Google account
+            </button>
+          </div>
+
+          <!-- Custom Google Form -->
+          <form id="custom-google-form" onsubmit="handleCustomGoogleSubmit(event)" class="hidden space-y-2 pt-2 border-t border-blue-200/60">
+            <div>
+              <label class="block text-[11px] font-medium text-stone-700 mb-1">Your Google / Gmail address</label>
+              <input type="email" id="custom-google-email" required placeholder="your.name@gmail.com" class="w-full px-3 py-2 rounded-xl border border-stone-300 bg-white text-xs text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#4285F4]">
+            </div>
+            <div>
+              <label class="block text-[11px] font-medium text-stone-700 mb-1">Display Name (optional)</label>
+              <input type="text" id="custom-google-name" placeholder="John Doe" class="w-full px-3 py-2 rounded-xl border border-stone-300 bg-white text-xs text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#4285F4]">
+            </div>
+            <button type="submit" class="w-full py-2 rounded-xl bg-[#1a73e8] hover:bg-[#1557b0] text-white text-xs font-semibold transition flex items-center justify-center gap-1.5 shadow-xs">
+              <span>Sign in as Google User</span>
+              <span>&rarr;</span>
+            </button>
+          </form>
+
+        </div>
+
+        <div class="flex items-center gap-3 my-2">
+          <div class="h-px bg-stone-200 flex-1"></div>
+          <span class="text-[11px] font-mono text-stone-400 uppercase tracking-wider">or email</span>
+          <div class="h-px bg-stone-200 flex-1"></div>
+        </div>
+
+        <!-- Developer Email Sign In Form -->
+        <form onsubmit="handleEmailSignIn(event)" class="space-y-2.5">
+          <div>
+            <label class="block text-[11px] font-medium text-stone-600 mb-1">Developer Email</label>
+            <input type="email" id="dev-email-input" required placeholder="developer@company.com" class="w-full px-3.5 py-2.5 rounded-xl border border-stone-200 bg-stone-50 text-xs text-stone-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#a8c242] transition">
+          </div>
+          <button type="submit" class="w-full py-2.5 rounded-xl bg-[#2d3f18] hover:bg-[#202e11] text-[#f7f9f0] text-xs font-semibold shadow-xs transition">
+            Sign In with Email
+          </button>
+        </form>
+
+        <!-- 1-Click Instant Demo Login -->
+        <div class="pt-2 text-center text-[11px] text-stone-500">
+          <span>Need instant evaluation? </span>
+          <button type="button" onclick="quickDemoLogin()" class="text-[#3e5517] font-semibold underline underline-offset-2 hover:text-[#2d3f18]">
+            1-Click Google Demo Login &rarr;
+          </button>
+        </div>
+
+        <!-- Advanced Google OAuth Client ID Drawer -->
+        <div class="pt-2">
+          <details class="text-[11px] text-stone-500 group">
+            <summary class="cursor-pointer hover:text-stone-700 flex items-center justify-between list-none py-1">
+              <span class="flex items-center gap-1.5 font-medium">
+                <svg class="w-3.5 h-3.5 text-stone-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><circle cx="12" cy="12" r="3"/></svg>
+                Google Cloud OAuth 2.0 Client ID (Optional)
+              </span>
+              <span class="group-open:rotate-180 transition-transform">&darr;</span>
+            </summary>
+            <div class="mt-2 space-y-2 p-2.5 rounded-xl bg-stone-50 border border-stone-200">
+              <p class="text-[10px] text-stone-500 leading-relaxed">
+                Enter your Google Cloud OAuth Client ID to trigger Google's native One-Tap popup.
+              </p>
+              <input type="text" id="custom-google-client-id" placeholder="your-client-id.apps.googleusercontent.com" class="w-full px-2.5 py-1.5 rounded-lg border border-stone-300 bg-white text-[11px] font-mono text-stone-900 focus:outline-none focus:ring-1 focus:ring-blue-500">
+              <div class="flex items-center gap-2">
+                <button type="button" onclick="saveGoogleClientId()" class="px-3 py-1 rounded-lg bg-stone-800 hover:bg-stone-900 text-white text-[11px] font-medium transition">
+                  Save &amp; Initialize GSI
+                </button>
+                <button type="button" onclick="clearGoogleClientId()" class="px-2 py-1 text-[11px] text-stone-500 hover:text-rose-600 transition">
+                  Clear
+                </button>
+              </div>
+            </div>
+          </details>
+        </div>
+
+      </div>
+
+    </div>
+  </main>
+
+  <!-- Minimal Footer -->
+  <footer class="w-full max-w-5xl mx-auto px-6 py-6 text-center text-xs text-stone-400">
+    &copy; 2026 CodeReviewGraph &bull; Stateful Multi-Agent Governance
+  </footer>
+
+  <!-- Notification Toast Container -->
+  <div id="toast-container" class="fixed bottom-6 right-6 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <script>
+    const AUTH_KEY = 'crg_auth_user';
+    const GOOGLE_CLIENT_ID_KEY = 'crg_google_client_id';
+    window.crgServerClientId = '';
+
+    // Check if user is already logged in
+    (function checkExistingSession() {
+      try {
+        const raw = localStorage.getItem(AUTH_KEY);
+        if (raw) {
+          const user = JSON.parse(raw);
+          if (user && user.authenticated) {
+            window.location.href = '/playground';
+          }
+        }
+      } catch (e) {}
+    })();
+
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toast-container');
+      if (!container) return;
+      const toast = document.createElement('div');
+      const bg = type === 'success' ? 'bg-[#2d3f18] text-[#f7f9f0] border-[#3e5517]' :
+                 type === 'error' ? 'bg-rose-900 text-rose-50 border-rose-700' :
+                 'bg-stone-900 text-stone-100 border-stone-800';
+      toast.className = `pointer-events-auto flex items-center gap-2.5 px-4 py-2.5 rounded-2xl border ${bg} text-xs font-medium shadow-xl transition-all duration-300 transform translate-y-2 opacity-0`;
+      const icon = type === 'success' ? '✓' : type === 'error' ? '✕' : 'ℹ';
+      toast.innerHTML = `<span class="w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold bg-white/20">${icon}</span><span>${message}</span>`;
+      container.appendChild(toast);
+      requestAnimationFrame(() => { toast.classList.remove('translate-y-2', 'opacity-0'); });
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-2');
+        setTimeout(() => toast.remove(), 300);
+      }, 3500);
+    }
+
+    function generateGoogleAvatar(name, email) {
+      const initial = (name || email || 'G').trim().charAt(0).toUpperCase();
+      const colors = ['#4285F4', '#34A853', '#EA4335', '#FBBC05', '#1a73e8'];
+      let hash = 0;
+      const str = (name || email || 'G');
+      for (let i = 0; i < str.length; i++) hash = (hash << 5) - hash + str.charCodeAt(i);
+      const color = colors[Math.abs(hash) % colors.length];
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 96 96"><circle cx="48" cy="48" r="48" fill="${color}"/><text x="50%" y="54%" font-family="Plus Jakarta Sans, sans-serif" font-size="44" font-weight="600" fill="#ffffff" dominant-baseline="middle" text-anchor="middle">${initial}</text></svg>`;
+      return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+    }
+
+    function openGoogleAccountChooser() {
+      const storedClientId = localStorage.getItem(GOOGLE_CLIENT_ID_KEY) || window.crgServerClientId;
+      if (storedClientId && typeof google !== 'undefined' && google.accounts && google.accounts.id) {
+        try {
+          google.accounts.id.prompt((notification) => {
+            if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+              document.getElementById('google-account-panel')?.classList.remove('hidden');
+            }
+          });
+          return;
+        } catch (e) {}
+      }
+      document.getElementById('google-account-panel')?.classList.toggle('hidden');
+    }
+
+    function closeGoogleAccountChooser() {
+      document.getElementById('google-account-panel')?.classList.add('hidden');
+    }
+
+    function toggleCustomGoogleInput() {
+      const form = document.getElementById('custom-google-form');
+      if (form) form.classList.toggle('hidden');
+    }
+
+    async function loginWithProfile(email, name, picture) {
+      const avatar = picture || generateGoogleAvatar(name, email);
+      try {
+        const res = await fetch('/api/auth/google', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: name, email: email, picture: avatar })
+        });
+        const profile = await res.json();
+        localStorage.setItem(AUTH_KEY, JSON.stringify({
+          id: profile.id,
+          name: profile.name || name,
+          email: profile.email || email,
+          picture: profile.picture || avatar,
+          provider: "google",
+          authenticated: true
+        }));
+      } catch (e) {
+        localStorage.setItem(AUTH_KEY, JSON.stringify({
+          name: name,
+          email: email,
+          picture: avatar,
+          provider: "google",
+          authenticated: true
+        }));
+      }
+
+      showToast(`Signed in as ${name}! Redirecting to playground...`, 'success');
+      setTimeout(() => {
+        window.location.href = '/playground';
+      }, 300);
+    }
+
+    function handleCustomGoogleSubmit(event) {
+      if (event) event.preventDefault();
+      const email = document.getElementById('custom-google-email')?.value.trim();
+      if (!email) return;
+      let name = document.getElementById('custom-google-name')?.value.trim();
+      if (!name) {
+        name = email.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+      }
+      loginWithProfile(email, name);
+    }
+
+    // Native Google GSI Response
+    async function handleGoogleGsiResponse(response) {
+      if (!response || !response.credential) return;
+      showToast("Verifying with Google...", "info");
+      try {
+        const res = await fetch('/api/auth/google', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ credential: response.credential })
+        });
+        const profile = await res.json();
+        localStorage.setItem(AUTH_KEY, JSON.stringify(profile));
+        showToast(`Signed in as ${profile.name}! Redirecting...`, 'success');
+        setTimeout(() => {
+          window.location.href = '/playground';
+        }, 300);
+      } catch (err) {
+        showToast("Google authentication failed. Please try again.", "error");
+      }
+    }
+
+    function setupGoogleGsi(clientId) {
+      if (!clientId) return;
+      if (typeof google !== 'undefined' && google.accounts && google.accounts.id) {
+        try {
+          google.accounts.id.initialize({
+            client_id: clientId,
+            callback: handleGoogleGsiResponse,
+            auto_select: false
+          });
+          const slot = document.getElementById('gsi-slot-container');
+          if (slot) {
+            slot.innerHTML = '';
+            google.accounts.id.renderButton(slot, {
+              theme: 'outline',
+              size: 'large',
+              text: 'continue_with',
+              shape: 'pill',
+              width: 280
+            });
+          }
+        } catch (e) {}
+      }
+    }
+
+    function saveGoogleClientId() {
+      const val = document.getElementById('custom-google-client-id')?.value.trim();
+      if (val) {
+        localStorage.setItem(GOOGLE_CLIENT_ID_KEY, val);
+        setupGoogleGsi(val);
+        showToast("Google Client ID saved. Initializing 1-Tap...", "success");
+      }
+    }
+
+    function clearGoogleClientId() {
+      localStorage.removeItem(GOOGLE_CLIENT_ID_KEY);
+      const input = document.getElementById('custom-google-client-id');
+      if (input) input.value = '';
+      const slot = document.getElementById('gsi-slot-container');
+      if (slot) slot.innerHTML = '';
+      showToast("Google Client ID cleared.", "info");
+    }
+
+    function handleEmailSignIn(event) {
+      if (event) event.preventDefault();
+      const email = document.getElementById('dev-email-input')?.value.trim() || 'developer@company.com';
+      const name = email.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+      const avatar = generateGoogleAvatar(name, email);
+
+      localStorage.setItem(AUTH_KEY, JSON.stringify({
+        name: name || "Developer",
+        email: email,
+        picture: avatar,
+        provider: "email",
+        authenticated: true
+      }));
+
+      showToast(`Signed in as ${name}! Redirecting...`, 'success');
+      setTimeout(() => {
+        window.location.href = '/playground';
+      }, 300);
+    }
+
+    function quickDemoLogin() {
+      loginWithProfile("alex.rivers.dev@gmail.com", "Alex Rivers");
+    }
+
+    // Initialize Auth Config on Load
+    document.addEventListener('DOMContentLoaded', async () => {
+      const storedId = localStorage.getItem(GOOGLE_CLIENT_ID_KEY);
+      const input = document.getElementById('custom-google-client-id');
+      if (storedId && input) input.value = storedId;
+
+      try {
+        const res = await fetch('/api/auth/config');
+        if (res.ok) {
+          const config = await res.json();
+          if (config.google_client_id) {
+            window.crgServerClientId = config.google_client_id;
+            if (!storedId && input) input.value = config.google_client_id;
+          }
+        }
+      } catch (e) {}
+
+      const activeId = storedId || window.crgServerClientId;
+      if (activeId) setupGoogleGsi(activeId);
+    });
+  </script>
+</body>
+</html>
