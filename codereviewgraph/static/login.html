@@ -105,7 +105,7 @@
         </form>
 
         <!-- Option 2: Step 2 - Enter OTP Code -->
-        <div id="otp-verify-form" class="hidden space-y-3 p-4 rounded-2xl bg-stone-50 border border-stone-200 transition-all">
+        <form id="otp-verify-form" onsubmit="handleVerifyOtp(event)" class="hidden space-y-3 p-4 rounded-2xl bg-stone-50 border border-stone-200 transition-all">
           <div class="text-left space-y-0.5">
             <div class="text-xs font-semibold text-stone-900">Enter 6-digit Code</div>
             <div class="text-[11px] text-stone-500">Sent to <span id="otp-target-display" class="font-mono text-stone-800 font-semibold"></span></div>
@@ -113,7 +113,7 @@
           <div>
             <input type="text" id="otp-code-input" maxlength="6" inputmode="numeric" pattern="[0-9]*" placeholder="••••••" class="w-full text-center tracking-[0.5em] text-lg font-mono font-bold px-3 py-2.5 rounded-xl border border-stone-300 bg-white text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#2d3f18] transition">
           </div>
-          <button id="verify-otp-btn" type="button" onclick="handleVerifyOtp()" class="w-full py-2.5 rounded-xl bg-[#2d3f18] hover:bg-[#202e11] text-[#f7f9f0] text-xs font-semibold shadow-xs transition flex items-center justify-center gap-2">
+          <button id="verify-otp-btn" type="submit" class="w-full py-2.5 rounded-xl bg-[#2d3f18] hover:bg-[#202e11] text-[#f7f9f0] text-xs font-semibold shadow-xs transition flex items-center justify-center gap-2">
             <span id="verify-otp-btn-text">Verify &amp; Sign In</span>
             <span id="verify-otp-btn-arrow">&rarr;</span>
           </button>
@@ -121,7 +121,7 @@
             <button type="button" onclick="handleResendOtp()" class="hover:text-stone-900 underline underline-offset-2">Resend Code</button>
             <button type="button" onclick="handleChangeEmail()" class="hover:text-stone-900 underline underline-offset-2">&larr; Change email</button>
           </div>
-        </div>
+        </form>
 
         <!-- Security Guarantee Notice -->
         <div class="p-3 rounded-xl bg-stone-50 border border-stone-200 text-[11px] text-stone-600 space-y-1">
@@ -163,11 +163,8 @@
   <div id="toast-container" class="fixed bottom-6 right-6 z-50 flex flex-col gap-2 pointer-events-none"></div>
 
   <script>
-    // Fixed Google OAuth 2.0 Client ID
-    const GOOGLE_CLIENT_ID = '985395568511-65nv6sl44qvkpcj7aac5ji33he8ms1jl.apps.googleusercontent.com';
     let isAuthenticating = false;
     let currentOtpEmail = '';
-    let currentOtpName = '';
 
     // Check if user already has an active authenticated session
     (async function checkExistingSession() {
@@ -198,7 +195,7 @@
           displayBody = "OAuth state validation failed. Please retry your login request.";
         } else if (err.includes('conflict')) {
           displayHeading = "Account Conflict";
-          displayBody = decodeURIComponent(msg || "An account with this email already exists under a different provider.");
+          displayBody = msg || "An account with this email already exists under a different provider.";
         }
         showAuthAlert(displayHeading, displayBody, 'error');
       }
@@ -213,7 +210,13 @@
                  'bg-stone-900 text-stone-100 border-stone-800';
       toast.className = `pointer-events-auto flex items-center gap-2.5 px-4 py-2.5 rounded-2xl border ${bg} text-xs font-medium shadow-xl transition-all duration-300 transform translate-y-2 opacity-0`;
       const icon = type === 'success' ? '✓' : type === 'error' ? '✕' : 'ℹ';
-      toast.innerHTML = `<span class="w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold bg-white/20">${icon}</span><span>${message}</span>`;
+      const iconSpan = document.createElement('span');
+      iconSpan.className = 'w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold bg-white/20';
+      iconSpan.textContent = icon;
+      const msgSpan = document.createElement('span');
+      msgSpan.textContent = message;
+      toast.appendChild(iconSpan);
+      toast.appendChild(msgSpan);
       container.appendChild(toast);
       requestAnimationFrame(() => { toast.classList.remove('translate-y-2', 'opacity-0'); });
       setTimeout(() => {
@@ -268,18 +271,17 @@
 
       try {
         const res = await fetch(`/api/auth/google/url?redirect_uri=${encodeURIComponent(redirectUri)}`);
-        if (res.ok) {
-          const data = await res.json();
-          if (data && data.url) {
-            window.location.href = data.url;
-            return;
-          }
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data && data.url) {
+          window.location.href = data.url;
+          return;
         }
-      } catch (e) {}
-
-      // Fallback direct Google OAuth 2.0 URL
-      const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?response_type=code&client_id=${encodeURIComponent(GOOGLE_CLIENT_ID)}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=openid%20email%20profile&access_type=offline&prompt=select_account`;
-      window.location.href = authUrl;
+        throw new Error(data.detail || "Unable to initiate Google Sign-In.");
+      } catch (err) {
+        isAuthenticating = false;
+        setButtonLoading(false, "Continue with Google");
+        showAuthAlert("Google Sign-In Unavailable", err.message || "Could not contact authentication server.", "error");
+      }
     }
 
     // --------------------------------------------------------------------------
@@ -304,13 +306,12 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: email, name: name })
         });
-        const data = await res.json();
+        const data = await res.json().catch(() => ({}));
         if (!res.ok) {
           throw new Error(data.detail || "Failed to send verification code.");
         }
 
         currentOtpEmail = email;
-        currentOtpName = name;
         document.getElementById('otp-target-display').innerText = email;
         document.getElementById('otp-send-form').classList.add('hidden');
         document.getElementById('otp-verify-form').classList.remove('hidden');
@@ -324,7 +325,8 @@
       }
     }
 
-    async function handleVerifyOtp() {
+    async function handleVerifyOtp(event) {
+      if (event) event.preventDefault();
       const code = document.getElementById('otp-code-input').value.trim();
       if (!code || code.length < 6) {
         showAuthAlert("Invalid Code", "Please enter the full 6-digit verification code.", "error");
@@ -344,7 +346,7 @@
           credentials: 'include',
           body: JSON.stringify({ email: currentOtpEmail, code: code })
         });
-        const data = await res.json();
+        const data = await res.json().catch(() => ({}));
         if (!res.ok) {
           throw new Error(data.detail || "Verification failed. Please check your code.");
         }

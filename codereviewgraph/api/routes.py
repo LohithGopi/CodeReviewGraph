@@ -5,6 +5,8 @@ and production-ready Google OAuth 2.0 authentication endpoints.
 """
 from __future__ import annotations
 
+import re
+import secrets
 import uuid
 import urllib.parse
 from typing import Optional, Dict, Any
@@ -16,13 +18,12 @@ from pydantic import BaseModel, Field
 from codereviewgraph.core.state import AuditReport
 from codereviewgraph.graph.workflow import review_app
 from codereviewgraph.storage.checkpointer import checkpoint_manager
-from codereviewgraph.storage.user_db import user_db
+from codereviewgraph.storage.user_db import user_db, OtpRateLimitError
 from codereviewgraph.api.auth import (
     auth_service,
     extract_session_token,
     set_session_cookie,
     clear_session_cookie,
-    get_current_user,
     get_optional_user,
     send_otp_email,
 )
@@ -63,7 +64,6 @@ class SendOtpResponse(BaseModel):
     status: str
     message: str
     email: str
-    dev_code: Optional[str] = None
 
 
 class VerifyOtpRequest(BaseModel):
@@ -120,15 +120,16 @@ def auth_config():
 
 
 @router.get("/api/auth/google/url")
-def auth_google_url(redirect_uri: Optional[str] = None):
+def auth_google_url(req: Request, redirect_uri: Optional[str] = None):
     """Generate a Google OAuth 2.0 authorization URL with CSRF state token."""
     if not auth_service.is_configured():
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Google OAuth is not configured. Please set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET."
         )
-    state = user_db.create_oauth_state(redirect_url=redirect_uri)
-    url = auth_service.build_authorization_url(state=state, redirect_uri=redirect_uri)
+    callback_uri = redirect_uri or auth_service.callback_url or str(req.url_for("auth_google_callback"))
+    state = user_db.create_oauth_state(redirect_url=callback_uri)
+    url = auth_service.build_authorization_url(state=state, redirect_uri=callback_uri)
     return {"url": url, "state": state}
 
 
@@ -218,8 +219,15 @@ def auth_google_callback(
     if redirect_url is None:
         return RedirectResponse(url="/login?error=invalid_csrf_state", status_code=302)
 
+    callback_used = redirect_url if redirect_url.startswith(("http://", "https://")) else None
+    target = (
+        redirect_url
+        if (redirect_url.startswith("/") and not redirect_url.startswith("//"))
+        else "/playground"
+    )
+
     try:
-        verified = auth_service.exchange_code_for_token(code)
+        verified = auth_service.exchange_code_for_token(code, redirect_uri=callback_used)
         user = user_db.create_or_update_google_user(
             google_id=verified["google_id"],
             email=verified["email"],
@@ -231,7 +239,6 @@ def auth_google_callback(
             user_agent=request.headers.get("user-agent"),
             ip_address=request.client.host if request.client else None
         )
-        target = redirect_url if (redirect_url and redirect_url.startswith("/")) else "/playground"
         redirect_res = RedirectResponse(url=target, status_code=302)
         set_session_cookie(redirect_res, session_id, request)
         return redirect_res
@@ -287,12 +294,8 @@ def auth_logout(request: Request, response: Response):
 @router.post("/api/auth/otp/send", response_model=SendOtpResponse)
 def auth_otp_send(request: SendOtpRequest):
     """Generate and dispatch a 6-digit one-time passcode to the user's email."""
-    import os
-    import secrets
-    import re
-
     email = request.email.strip().lower()
-    if not email or not re.match(r"^[^@]+@[^@]+\.[^@]+$", email):
+    if not email or not re.match(r"\A[^\s@]+@[^\s@]+\.[^\s@]+\Z", email):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Please provide a valid email address."
@@ -301,15 +304,26 @@ def auth_otp_send(request: SendOtpRequest):
     name = request.name.strip() if request.name else email.split("@")[0].title()
     code = "".join(secrets.choice("0123456789") for _ in range(6))
 
-    user_db.store_otp(email=email, name=name, code=code, expires_in_seconds=600)
-    send_otp_email(to_email=email, name=name, code=code)
+    try:
+        user_db.store_otp(email=email, name=name, code=code, expires_in_seconds=600)
+    except OtpRateLimitError as e:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=str(e),
+            headers={"Retry-After": str(e.retry_after)},
+        )
 
-    is_dev = os.getenv("ENVIRONMENT", "").lower() != "production"
+    if not send_otp_email(to_email=email, name=name, code=code):
+        user_db.delete_otp(email)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Failed to send verification email. Please try again later.",
+        )
+
     return SendOtpResponse(
         status="sent",
         message=f"Verification code sent to {email}",
         email=email,
-        dev_code=code if is_dev else None
     )
 
 
@@ -332,7 +346,11 @@ def auth_otp_verify(request: VerifyOtpRequest, req: Request, response: Response)
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Verification failed: {str(e)}")
 
-    user = user_db.create_or_update_email_user(email=verified["email"], name=verified["name"])
+    try:
+        user = user_db.create_or_update_email_user(email=verified["email"], name=verified["name"])
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
+
     session_id = user_db.create_session(
         user_id=user["id"],
         user_agent=req.headers.get("user-agent"),
@@ -345,7 +363,7 @@ def auth_otp_verify(request: VerifyOtpRequest, req: Request, response: Response)
         email=user["email"],
         name=user["name"],
         picture=user.get("picture"),
-        provider="email",
+        provider=user.get("provider", "email"),
         authenticated=True
     )
 
@@ -368,7 +386,7 @@ def audit_code(request: AuditRequest, current_user: Optional[Dict[str, Any]] = D
         "language": request.language,
         "file_path": request.file_path,
         "current_stage": "STARTED",
-        "actor": current_user["email"] if current_user else "anonymous"
+        "actor": current_user["id"] if current_user else "anonymous"
     }
 
     try:
@@ -384,9 +402,15 @@ def audit_code(request: AuditRequest, current_user: Optional[Dict[str, Any]] = D
 
 
 @router.get("/api/runs/{thread_id}")
-def get_run_checkpoint(thread_id: str):
+def get_run_checkpoint(thread_id: str, current_user: Optional[Dict[str, Any]] = Depends(get_optional_user)):
     """Retrieve checkpointed state for an audit run."""
     state = checkpoint_manager.get_run_state(review_app, thread_id)
     if not state:
         raise HTTPException(status_code=404, detail=f"No run found for thread_id '{thread_id}'")
+    owner = state.get("values", {}).get("actor")
+    if owner and owner != "anonymous":
+        if not current_user:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required.")
+        if current_user["id"] != owner:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied for this audit run.")
     return state

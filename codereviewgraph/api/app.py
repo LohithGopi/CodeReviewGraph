@@ -157,18 +157,6 @@ def serve_google_verification():
     )
 
 
-@app.get("/google{token}.html", include_in_schema=False)
-def serve_generic_google_verification(token: str):
-    """Serve generic Google site verification token with 200 OK."""
-    return Response(
-        content=f"google-site-verification: google{token}.html",
-        media_type="text/html",
-        status_code=200
-    )
-
-
-
-
 @app.get("/api", include_in_schema=False)
 def api_overview():
     """API overview endpoint for friendly status discovery."""

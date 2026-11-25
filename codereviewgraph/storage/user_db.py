@@ -30,6 +30,14 @@ def get_default_db_path() -> str:
     return "codereviewgraph.db"
 
 
+class OtpRateLimitError(ValueError):
+    """Raised when an OTP send request is throttled by the cooldown window."""
+
+    def __init__(self, message: str, retry_after: int = 60):
+        super().__init__(message)
+        self.retry_after = retry_after
+
+
 class UserDatabase:
     """SQLite-based user and session store with connection pooling and thread safety."""
 
@@ -48,7 +56,7 @@ class UserDatabase:
         self._init_db()
 
     @contextmanager
-    def _get_connection(self) -> Generator[sqlite3.Connection, None, None]:
+    def _get_connection(self, immediate: bool = False) -> Generator[sqlite3.Connection, None, None]:
         """Yield a configured SQLite connection within a transaction context."""
         if self._is_memory and self._mem_conn is not None:
             with self._lock:
@@ -61,10 +69,8 @@ class UserDatabase:
         try:
             with conn:
                 conn.execute("PRAGMA foreign_keys = ON;")
-                try:
-                    conn.execute("PRAGMA journal_mode = WAL;")
-                except sqlite3.OperationalError:
-                    pass
+                if immediate:
+                    conn.execute("BEGIN IMMEDIATE;")
                 yield conn
         finally:
             conn.close()
@@ -75,7 +81,12 @@ class UserDatabase:
             parent = Path(self.db_path).resolve().parent
             parent.mkdir(parents=True, exist_ok=True)
 
-        with self._get_connection() as conn:
+        with self._get_connection(immediate=True) as conn:
+            if not self._is_memory:
+                try:
+                    conn.execute("PRAGMA journal_mode = WAL;")
+                except sqlite3.OperationalError:
+                    pass
             # Users table
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS users (
@@ -137,20 +148,6 @@ class UserDatabase:
     # User Management
     # --------------------------------------------------------------------------
 
-    def get_user_by_id(self, user_id: str) -> Optional[Dict[str, Any]]:
-        """Retrieve user by internal ID."""
-        with self._get_connection() as conn:
-            cur = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,))
-            row = cur.fetchone()
-            return dict(row) if row else None
-
-    def get_user_by_email(self, email: str) -> Optional[Dict[str, Any]]:
-        """Retrieve user by email address (case-insensitive)."""
-        with self._get_connection() as conn:
-            cur = conn.execute("SELECT * FROM users WHERE LOWER(email) = LOWER(?)", (email.strip(),))
-            row = cur.fetchone()
-            return dict(row) if row else None
-
     def get_user_by_google_id(self, google_id: str) -> Optional[Dict[str, Any]]:
         """Retrieve user by Google subject identifier (sub)."""
         with self._get_connection() as conn:
@@ -170,14 +167,14 @@ class UserDatabase:
         
         Enforces security checks:
         - Prevents duplicate accounts.
-        - Refuses automatic linking if an existing account belongs to a different
-          authentication provider (e.g. password-based) without verified linkage.
+        - Refuses automatic linking if an existing account belongs to a
+          non-verified provider (e.g. password-based) without password verification.
         """
         now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
         clean_email = email.strip().lower()
         clean_google_id = str(google_id).strip()
 
-        with self._get_connection() as conn:
+        with self._get_connection(immediate=True) as conn:
             # 1. Existing user with this Google ID
             cur = conn.execute("SELECT * FROM users WHERE google_id = ?", (clean_google_id,))
             existing = cur.fetchone()
@@ -194,17 +191,15 @@ class UserDatabase:
             cur = conn.execute("SELECT * FROM users WHERE LOWER(email) = ?", (clean_email,))
             existing_email = cur.fetchone()
             if existing_email:
-                # Security rule: If existing account is not google provider or has a different google_id, disallow automatic linking
-                if existing_email["provider"] != "google":
+                if existing_email["provider"] not in ("google", "email"):
                     raise ValueError(
                         f"An account with email '{clean_email}' already exists with provider "
                         f"'{existing_email['provider']}'. Automatic account linking without password "
                         "verification is disabled for security."
                     )
-                # If provider is google but google_id wasn't set, link it now
                 conn.execute("""
                     UPDATE users
-                    SET google_id = ?, name = ?, picture = COALESCE(?, picture), last_login_at = ?
+                    SET google_id = ?, name = ?, picture = COALESCE(?, picture), provider = 'google', last_login_at = ?
                     WHERE id = ?
                 """, (clean_google_id, name, picture, now_iso, existing_email["id"]))
                 cur = conn.execute("SELECT * FROM users WHERE id = ?", (existing_email["id"],))
@@ -234,13 +229,15 @@ class UserDatabase:
         """Create a new cryptographically secure session token for a user."""
         session_id = secrets.token_urlsafe(32)
         now = datetime.datetime.now(datetime.timezone.utc)
+        now_iso = now.isoformat()
         expires_at = (now + datetime.timedelta(seconds=expires_in_seconds)).isoformat()
 
-        with self._get_connection() as conn:
+        with self._get_connection(immediate=True) as conn:
+            self._purge_expired_in_conn(conn, now_iso)
             conn.execute("""
                 INSERT INTO sessions (session_id, user_id, created_at, expires_at, user_agent, ip_address)
                 VALUES (?, ?, ?, ?, ?, ?)
-            """, (session_id, user_id, now.isoformat(), expires_at, user_agent, ip_address))
+            """, (session_id, user_id, now_iso, expires_at, user_agent, ip_address))
 
         return session_id
 
@@ -268,20 +265,13 @@ class UserDatabase:
                 conn.execute("DELETE FROM sessions WHERE session_id = ?", (session_id,))
                 return None
 
-            user_data = dict(row)
-            return user_data
+            return dict(row)
 
     def delete_session(self, session_id: str) -> bool:
         """Invalidate a session on logout."""
-        with self._get_connection() as conn:
+        with self._get_connection(immediate=True) as conn:
             cur = conn.execute("DELETE FROM sessions WHERE session_id = ?", (session_id,))
             return cur.rowcount > 0
-
-    def delete_user_sessions(self, user_id: str) -> int:
-        """Invalidate all active sessions for a user (e.g., password change or global logout)."""
-        with self._get_connection() as conn:
-            cur = conn.execute("DELETE FROM sessions WHERE user_id = ?", (user_id,))
-            return cur.rowcount
 
     # --------------------------------------------------------------------------
     # OAuth CSRF State Validation
@@ -293,7 +283,7 @@ class UserDatabase:
         now = datetime.datetime.now(datetime.timezone.utc)
         expires_at = (now + datetime.timedelta(seconds=expires_in_seconds)).isoformat()
 
-        with self._get_connection() as conn:
+        with self._get_connection(immediate=True) as conn:
             conn.execute("""
                 INSERT INTO oauth_states (state, redirect_url, created_at, expires_at)
                 VALUES (?, ?, ?, ?)
@@ -307,7 +297,7 @@ class UserDatabase:
             return None
 
         now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
-        with self._get_connection() as conn:
+        with self._get_connection(immediate=True) as conn:
             cur = conn.execute("SELECT * FROM oauth_states WHERE state = ?", (state,))
             row = cur.fetchone()
             if not row:
@@ -321,26 +311,55 @@ class UserDatabase:
 
             return row["redirect_url"] or ""
 
+    def _purge_expired_in_conn(self, conn: sqlite3.Connection, now_iso: str) -> None:
+        conn.execute("DELETE FROM sessions WHERE expires_at <= ?", (now_iso,))
+        conn.execute("DELETE FROM oauth_states WHERE expires_at <= ?", (now_iso,))
+        conn.execute("DELETE FROM otps WHERE expires_at <= ?", (now_iso,))
+
     def cleanup_expired(self) -> None:
-        """Housekeeping: purge expired sessions and stale OAuth state tokens."""
+        """Housekeeping: purge expired sessions, OAuth state tokens, and OTPs."""
         now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
-        with self._get_connection() as conn:
-            conn.execute("DELETE FROM sessions WHERE expires_at <= ?", (now_iso,))
-            conn.execute("DELETE FROM oauth_states WHERE expires_at <= ?", (now_iso,))
-            conn.execute("DELETE FROM otps WHERE expires_at <= ?", (now_iso,))
+        with self._get_connection(immediate=True) as conn:
+            self._purge_expired_in_conn(conn, now_iso)
 
     # --------------------------------------------------------------------------
     # Email + OTP Verification Management
     # --------------------------------------------------------------------------
 
-    def store_otp(self, email: str, name: str, code: str, expires_in_seconds: int = 600) -> None:
-        """Store or replace an active OTP for an email address."""
+    def store_otp(
+        self,
+        email: str,
+        name: str,
+        code: str,
+        expires_in_seconds: int = 600,
+        cooldown_seconds: int = 60,
+    ) -> None:
+        """Store or replace an active OTP for an email address, enforcing send cooldown."""
         clean_email = email.strip().lower()
         clean_name = name.strip() or clean_email.split("@")[0].title()
         now = datetime.datetime.now(datetime.timezone.utc)
+        now_iso = now.isoformat()
         expires_at = (now + datetime.timedelta(seconds=expires_in_seconds)).isoformat()
 
-        with self._get_connection() as conn:
+        with self._get_connection(immediate=True) as conn:
+            self._purge_expired_in_conn(conn, now_iso)
+            if cooldown_seconds > 0:
+                existing = conn.execute(
+                    "SELECT created_at, expires_at FROM otps WHERE email = ?",
+                    (clean_email,),
+                ).fetchone()
+                if existing and existing["expires_at"] > now_iso:
+                    created_at = datetime.datetime.fromisoformat(existing["created_at"])
+                    if created_at.tzinfo is None:
+                        created_at = created_at.replace(tzinfo=datetime.timezone.utc)
+                    elapsed = (now - created_at).total_seconds()
+                    if elapsed < cooldown_seconds:
+                        wait_secs = max(1, int(cooldown_seconds - elapsed))
+                        raise OtpRateLimitError(
+                            f"Please wait {wait_secs}s before requesting another verification code.",
+                            retry_after=wait_secs,
+                        )
+
             conn.execute("""
                 INSERT INTO otps (email, name, code, created_at, expires_at, attempts)
                 VALUES (?, ?, ?, ?, ?, 0)
@@ -350,7 +369,12 @@ class UserDatabase:
                     created_at = excluded.created_at,
                     expires_at = excluded.expires_at,
                     attempts = 0;
-            """, (clean_email, clean_name, code.strip(), now.isoformat(), expires_at))
+            """, (clean_email, clean_name, code.strip(), now_iso, expires_at))
+
+    def delete_otp(self, email: str) -> None:
+        """Delete any stored OTP for an email (e.g. if email dispatch failed)."""
+        with self._get_connection(immediate=True) as conn:
+            conn.execute("DELETE FROM otps WHERE email = ?", (email.strip().lower(),))
 
     def verify_otp(self, email: str, code: str) -> Dict[str, Any]:
         """
@@ -364,36 +388,31 @@ class UserDatabase:
         clean_email = email.strip().lower()
         clean_code = code.strip()
         now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        error_msg: Optional[str] = None
 
-        with self._get_connection() as conn:
+        with self._get_connection(immediate=True) as conn:
             cur = conn.execute("SELECT * FROM otps WHERE email = ?", (clean_email,))
             row = cur.fetchone()
             if not row:
-                raise ValueError("No active verification code found for this email. Please request a new code.")
-
-            # Check expiration
-            if row["expires_at"] <= now_iso:
+                error_msg = "No active verification code found for this email. Please request a new code."
+            elif row["expires_at"] <= now_iso:
                 conn.execute("DELETE FROM otps WHERE email = ?", (clean_email,))
-                raise ValueError("Verification code has expired. Please request a new code.")
-
-            # Check max attempts (rate limiting)
-            if row["attempts"] >= 5:
-                conn.execute("DELETE FROM otps WHERE email = ?", (clean_email,))
-                raise ValueError("Too many failed attempts. This code has been invalidated for security. Please request a new code.")
-
-            # Validate code match
-            if row["code"] != clean_code:
-                conn.execute("UPDATE otps SET attempts = attempts + 1 WHERE email = ?", (clean_email,))
-                attempts_left = 4 - row["attempts"]
+                error_msg = "Verification code has expired. Please request a new code."
+            elif row["attempts"] >= 5:
+                error_msg = "Too many failed attempts. This code has been invalidated for security. Please request a new code."
+            elif row["code"] != clean_code:
+                new_attempts = row["attempts"] + 1
+                conn.execute("UPDATE otps SET attempts = ? WHERE email = ?", (new_attempts, clean_email))
+                attempts_left = 5 - new_attempts
                 if attempts_left > 0:
-                    raise ValueError(f"Incorrect verification code. {attempts_left} attempts remaining.")
+                    error_msg = f"Incorrect verification code. {attempts_left} attempts remaining."
                 else:
-                    conn.execute("DELETE FROM otps WHERE email = ?", (clean_email,))
-                    raise ValueError("Too many failed attempts. Please request a new code.")
+                    error_msg = "Too many failed attempts. This code has been invalidated for security. Please request a new code."
+            else:
+                conn.execute("DELETE FROM otps WHERE email = ?", (clean_email,))
+                return {"email": clean_email, "name": row["name"]}
 
-            # Success - consume single-use OTP
-            conn.execute("DELETE FROM otps WHERE email = ?", (clean_email,))
-            return {"email": clean_email, "name": row["name"]}
+        raise ValueError(error_msg)
 
     def create_or_update_email_user(self, email: str, name: str) -> Dict[str, Any]:
         """Register or update an authenticated user verified via Email OTP."""
@@ -401,10 +420,16 @@ class UserDatabase:
         clean_name = name.strip() or clean_email.split("@")[0].title()
         now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
 
-        with self._get_connection() as conn:
+        with self._get_connection(immediate=True) as conn:
             cur = conn.execute("SELECT * FROM users WHERE LOWER(email) = ?", (clean_email,))
             existing = cur.fetchone()
             if existing:
+                if existing["provider"] not in ("email", "google"):
+                    raise ValueError(
+                        f"An account with email '{clean_email}' already exists with provider "
+                        f"'{existing['provider']}'. Automatic account linking without password "
+                        "verification is disabled for security."
+                    )
                 conn.execute("""
                     UPDATE users 
                     SET name = COALESCE(NULLIF(?, ''), name), last_login_at = ?

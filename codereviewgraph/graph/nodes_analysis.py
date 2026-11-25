@@ -1,9 +1,8 @@
 """Analysis nodes for CodeReviewGraph: Planner, Security Auditor, and Quality/Performance."""
-import json
 from langchain_core.messages import HumanMessage
 from codereviewgraph.core.state import CodeReviewState
 from codereviewgraph.core.security_rules import analyze_ast, scan_security_rules, scan_quality_rules
-from codereviewgraph.core.models import get_chat_model
+from codereviewgraph.core.models import get_chat_model, parse_llm_json
 
 
 def planner_node(state: CodeReviewState) -> CodeReviewState:
@@ -59,20 +58,21 @@ def planner_node(state: CodeReviewState) -> CodeReviewState:
 def security_auditor_node(state: CodeReviewState) -> CodeReviewState:
     """Security node: identifies OWASP vulnerabilities, injection risks, and secret leaks."""
     code = state.get("raw_code", "")
+    language = state.get("language", "python")
     model = get_chat_model()
     
     prompt = (
         "TASK: SECURITY_AUDIT\n"
         "Analyze the following code for security vulnerabilities, injection flaws, and exposed credentials:\n"
-        f"```python\n{code}\n```"
+        f"```{language}\n{code}\n```"
     )
     
     response = model.invoke([HumanMessage(content=prompt)])
     findings = []
     
     try:
-        data = json.loads(str(response.content))
-        if isinstance(data, dict) and "findings" in data:
+        data = parse_llm_json(response.content)
+        if "findings" in data:
             findings = data["findings"]
     except Exception:
         # Fallback to direct pattern scan
@@ -89,20 +89,21 @@ def security_auditor_node(state: CodeReviewState) -> CodeReviewState:
 def quality_performance_node(state: CodeReviewState) -> CodeReviewState:
     """Quality & performance node: evaluates maintainability, complexity, and smells."""
     code = state.get("raw_code", "")
+    language = state.get("language", "python")
     model = get_chat_model()
     
     prompt = (
         "TASK: QUALITY_AUDIT\n"
         "Evaluate the following code for code smells, error handling quality, and anti-patterns:\n"
-        f"```python\n{code}\n```"
+        f"```{language}\n{code}\n```"
     )
     
     response = model.invoke([HumanMessage(content=prompt)])
     findings = []
     
     try:
-        data = json.loads(str(response.content))
-        if isinstance(data, dict) and "findings" in data:
+        data = parse_llm_json(response.content)
+        if "findings" in data:
             findings = data["findings"]
     except Exception:
         findings = scan_quality_rules(code)

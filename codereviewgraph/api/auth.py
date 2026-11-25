@@ -225,29 +225,6 @@ def extract_session_token(request: Request) -> Optional[str]:
     return None
 
 
-def get_current_user(request: Request) -> Dict[str, Any]:
-    """
-    FastAPI dependency requiring an authenticated session.
-    
-    Raises HTTP 401 Unauthorized if no valid session is found.
-    """
-    token = extract_session_token(request)
-    if not token:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication required. Please sign in with Google."
-        )
-
-    user = user_db.get_session_user(token)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Session expired or invalid. Please sign in again."
-        )
-
-    return user
-
-
 def get_optional_user(request: Request) -> Optional[Dict[str, Any]]:
     """FastAPI dependency returning the authenticated user if present, or None."""
     token = extract_session_token(request)
@@ -267,14 +244,17 @@ def send_otp_email(to_email: str, name: str, code: str) -> bool:
     import smtplib
     from email.mime.text import MIMEText
 
+    clean_email = to_email.replace("\r", "").replace("\n", "").strip()
+    clean_name = name.replace("\r", " ").replace("\n", " ").strip()
+
     smtp_host = os.getenv("SMTP_HOST")
-    smtp_port = int(os.getenv("SMTP_PORT", "587"))
+    smtp_port = int(os.getenv("SMTP_PORT") or "587")
     smtp_user = os.getenv("SMTP_USER")
     smtp_pass = os.getenv("SMTP_PASSWORD")
     sender = os.getenv("SMTP_FROM", "noreply@codereviewgraph.dev")
 
     subject = f"Your CodeReviewGraph Verification Code: {code}"
-    body = f"""Hello {name},
+    body = f"""Hello {clean_name},
 
 Your one-time login verification code for CodeReviewGraph is:
 
@@ -293,18 +273,23 @@ CodeReviewGraph Team
             msg = MIMEText(body)
             msg["Subject"] = subject
             msg["From"] = sender
-            msg["To"] = to_email
+            msg["To"] = clean_email
 
-            with smtplib.SMTP(smtp_host, smtp_port, timeout=10.0) as server:
-                server.starttls()
-                server.login(smtp_user, smtp_pass)
-                server.sendmail(sender, [to_email], msg.as_string())
+            if smtp_port == 465:
+                with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=10.0) as server:
+                    server.login(smtp_user, smtp_pass)
+                    server.sendmail(sender, [clean_email], msg.as_string())
+            else:
+                with smtplib.SMTP(smtp_host, smtp_port, timeout=10.0) as server:
+                    server.starttls()
+                    server.login(smtp_user, smtp_pass)
+                    server.sendmail(sender, [clean_email], msg.as_string())
             return True
         except Exception as e:
             print(f"[Warning] SMTP email delivery failed: {e}")
             return False
 
     # Standard fallback for development/demo: log code to standard output
-    print(f"\n[CodeReviewGraph Auth] ✉️ OTP sent to {to_email} ({name}): {code}\n")
+    print(f"\n[CodeReviewGraph Auth] ✉️ OTP sent to {clean_email} ({clean_name}): {code}\n")
     return True
 

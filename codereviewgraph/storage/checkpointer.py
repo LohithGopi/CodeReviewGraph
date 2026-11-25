@@ -1,4 +1,5 @@
 """Persistence and checkpointer management for CodeReviewGraph."""
+import threading
 from typing import Optional, Dict, Any, List
 from langgraph.checkpoint.memory import MemorySaver
 
@@ -10,17 +11,19 @@ class BoundedMemorySaver(MemorySaver):
         super().__init__()
         self.max_threads = max_threads
         self._thread_order: List[str] = []
+        self._lock = threading.Lock()
 
     def put(self, config: Dict[str, Any], checkpoint: Any, metadata: Any, new_versions: Any) -> Any:
         thread_id = config.get("configurable", {}).get("thread_id")
-        if thread_id:
-            if thread_id in self._thread_order:
-                self._thread_order.remove(thread_id)
-            self._thread_order.append(thread_id)
-            while len(self._thread_order) > self.max_threads:
-                oldest = self._thread_order.pop(0)
-                self.delete_thread(oldest)
-        return super().put(config, checkpoint, metadata, new_versions)
+        with self._lock:
+            if thread_id:
+                if thread_id in self._thread_order:
+                    self._thread_order.remove(thread_id)
+                self._thread_order.append(thread_id)
+                while len(self._thread_order) > self.max_threads:
+                    oldest = self._thread_order.pop(0)
+                    self.delete_thread(oldest)
+            return super().put(config, checkpoint, metadata, new_versions)
 
 
 class CheckpointManager:

@@ -172,6 +172,44 @@ def test_login_and_playground_include_legal_links():
         assert 'href="/terms"' in response.text
 
 
+def test_wildcard_google_verification_xss_removed():
+    response = client.get("/google%3Cimg%20src=x%20onerror=alert(1)%3E.html")
+    assert response.status_code == 404
+
+
+def test_playground_uses_backend_report_fields():
+    response = client.get("/playground")
+    assert response.status_code == 200
+    assert "report.health_score" in response.text
+    assert "report.patches" in response.text
+    assert "report.ast_metrics" in response.text
+
+
+def test_authenticated_run_checkpoint_requires_owner():
+    from codereviewgraph.storage.user_db import user_db
+    from codereviewgraph.api.auth import SESSION_COOKIE_NAME
+
+    owner = user_db.create_or_update_email_user("owner@test.dev", "Owner")
+    other = user_db.create_or_update_email_user("other@test.dev", "Other")
+    owner_sess = user_db.create_session(owner["id"])
+    other_sess = user_db.create_session(other["id"])
+
+    client.cookies.set(SESSION_COOKIE_NAME, owner_sess)
+    audit_res = client.post("/api/audit", json={"code": "x = 1", "thread_id": "owned-run-1"})
+    assert audit_res.status_code == 200
+
+    # Owner can access
+    assert client.get("/api/runs/owned-run-1").status_code == 200
+
+    # Other user is forbidden
+    client.cookies.set(SESSION_COOKIE_NAME, other_sess)
+    assert client.get("/api/runs/owned-run-1").status_code == 403
+
+    # Unauthenticated request is rejected
+    client.cookies.clear()
+    assert client.get("/api/runs/owned-run-1").status_code == 401
+
+
 
 
 

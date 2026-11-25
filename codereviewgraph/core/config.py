@@ -47,7 +47,6 @@ class Settings(BaseModel):
     google_client_id: str = Field(default_factory=lambda: os.getenv("GOOGLE_CLIENT_ID", DEFAULT_GOOGLE_CLIENT_ID))
     google_client_secret: str = Field(default_factory=lambda: os.getenv("GOOGLE_CLIENT_SECRET", ""))
     google_callback_url: str = Field(default_factory=lambda: os.getenv("GOOGLE_CALLBACK_URL", ""))
-    session_secret: str = Field(default_factory=lambda: os.getenv("SESSION_SECRET", ""))
     app_base_url: str = Field(default_factory=lambda: os.getenv("APP_BASE_URL", "http://localhost:8000"))
     database_path: str = Field(default_factory=lambda: os.getenv("DATABASE_PATH", ""))
     environment: str = Field(default_factory=lambda: os.getenv("ENVIRONMENT", os.getenv("NODE_ENV", "development")))

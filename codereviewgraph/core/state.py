@@ -62,6 +62,7 @@ class CodeReviewState(TypedDict, total=False):
     raw_code: str
     file_path: Optional[str]
     language: str
+    actor: Optional[str]
     ast_summary: Dict[str, Any]
     security_findings: List[Dict[str, Any]]
     quality_findings: List[Dict[str, Any]]

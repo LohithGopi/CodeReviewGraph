@@ -286,7 +286,125 @@ def test_otp_send_and_verify_flow():
 
 
 def test_otp_invalid_email():
-    """Scenario 14: Invalid email format is rejected."""
+    """Scenario 14: Invalid email format (and newline injection) is rejected."""
     res = client.post("/api/auth/otp/send", json={"email": "invalid-format"})
     assert res.status_code == 400
     assert "valid email" in res.json()["detail"].lower()
+
+    res_nl = client.post("/api/auth/otp/send", json={"email": "user@example.com\nBcc:evil@x.com"})
+    assert res_nl.status_code == 400
+
+
+def test_otp_never_exposes_dev_code_and_enforces_cooldown():
+    """Scenario 15: /api/auth/otp/send omits dev_code and throttles rapid resends."""
+    res1 = client.post("/api/auth/otp/send", json={"email": "rate@company.com", "name": "Rate User"})
+    assert res1.status_code == 200
+    assert "dev_code" not in res1.json()
+
+    res2 = client.post("/api/auth/otp/send", json={"email": "rate@company.com", "name": "Rate User"})
+    assert res2.status_code == 429
+    assert "Retry-After" in res2.headers
+
+
+def test_otp_five_attempt_lockout_and_single_use():
+    """Scenario 16: Five wrong OTP guesses lock out the code; valid codes are single-use."""
+    user_db.store_otp(email="lock@company.com", name="Lock", code="654321", cooldown_seconds=0)
+    for _ in range(5):
+        bad = client.post("/api/auth/otp/verify", json={"email": "lock@company.com", "code": "000000"})
+        assert bad.status_code == 400
+
+    # Even the correct code is rejected after 5 failed attempts
+    locked = client.post("/api/auth/otp/verify", json={"email": "lock@company.com", "code": "654321"})
+    assert locked.status_code == 400
+    assert "too many failed attempts" in locked.json()["detail"].lower()
+
+    # Single-use verification
+    user_db.store_otp(email="once@company.com", name="Once", code="123456", cooldown_seconds=0)
+    ok = client.post("/api/auth/otp/verify", json={"email": "once@company.com", "code": "123456"})
+    assert ok.status_code == 200
+    reuse = client.post("/api/auth/otp/verify", json={"email": "once@company.com", "code": "123456"})
+    assert reuse.status_code == 400
+    client.cookies.clear()
+
+
+def test_otp_expiration_rejected():
+    """Scenario 17: Expired OTPs are rejected."""
+    user_db.store_otp(email="expired@company.com", name="Exp", code="111222", expires_in_seconds=-5)
+    res = client.post("/api/auth/otp/verify", json={"email": "expired@company.com", "code": "111222"})
+    assert res.status_code == 400
+    assert "expired" in res.json()["detail"].lower()
+
+
+def test_otp_smtp_failure_returns_503_and_clears_otp():
+    """Scenario 18: SMTP delivery failure returns 503 and does not trap user in cooldown."""
+    with patch("codereviewgraph.api.routes.send_otp_email", return_value=False):
+        res = client.post("/api/auth/otp/send", json={"email": "smtp@company.com", "name": "SMTP"})
+        assert res.status_code == 503
+
+    # Retry succeeds immediately once delivery works
+    res2 = client.post("/api/auth/otp/send", json={"email": "smtp@company.com", "name": "SMTP"})
+    assert res2.status_code == 200
+
+
+def test_email_otp_and_google_interop_and_password_isolation():
+    """Scenario 19: Verified Google & Email OTP share accounts; password accounts remain isolated."""
+    # Email OTP then Google sign-in on same email
+    user_db.store_otp(email="dual@gmail.com", name="Dual User", code="222333")
+    otp_res = client.post("/api/auth/otp/verify", json={"email": "dual@gmail.com", "code": "222333"})
+    assert otp_res.status_code == 200
+    client.cookies.clear()
+
+    with patch.object(auth_service, "verify_id_token", return_value={
+        "google_id": "google-sub-dual",
+        "email": "dual@gmail.com",
+        "name": "Dual Google",
+        "picture": "https://pic.test/a.png",
+        "email_verified": True,
+    }):
+        g_res = client.post("/api/auth/google", json={"credential": "tok"})
+        assert g_res.status_code == 200
+        assert g_res.json()["id"] == otp_res.json()["id"]
+    client.cookies.clear()
+
+    # Subsequent Email OTP keeps consistent provider="google"
+    user_db.store_otp(email="dual@gmail.com", name="Dual User", code="444555", cooldown_seconds=0)
+    otp_again = client.post("/api/auth/otp/verify", json={"email": "dual@gmail.com", "code": "444555"})
+    assert otp_again.status_code == 200
+    assert otp_again.json()["provider"] == "google"
+    client.cookies.clear()
+
+    # Password account refuses Email OTP auto-linking with 409
+    with user_db._get_connection() as conn:
+        conn.execute("""
+            INSERT INTO users (id, google_id, email, name, provider, password_hash, created_at, last_login_at)
+            VALUES ('usr_pwd_2', NULL, 'pwd@corporate.com', 'Pwd User', 'password', 'hash', '2026-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00')
+        """)
+    user_db.store_otp(email="pwd@corporate.com", name="Attacker", code="777888")
+    conflict = client.post("/api/auth/otp/verify", json={"email": "pwd@corporate.com", "code": "777888"})
+    assert conflict.status_code == 409
+
+
+def test_google_callback_uses_matching_redirect_uri():
+    """Scenario 20: OAuth callback passes the exact redirect_uri stored during /google/url."""
+    custom_cb = "http://127.0.0.1:8000/api/auth/google/callback"
+    url_res = client.get(f"/api/auth/google/url?redirect_uri={custom_cb}")
+    assert url_res.status_code == 200
+    state = url_res.json()["state"]
+
+    with patch.object(auth_service, "exchange_code_for_token", return_value={
+        "google_id": "g-cb-1",
+        "email": "cb@gmail.com",
+        "name": "CB User",
+        "picture": None,
+        "email_verified": True,
+    }) as mock_ex:
+        cb_res = client.get(f"/api/auth/google/callback?code=auth-code-1&state={state}", follow_redirects=False)
+        assert cb_res.status_code == 302
+        assert cb_res.headers["location"] == "/playground"
+        mock_ex.assert_called_once_with("auth-code-1", redirect_uri=custom_cb)
+
+
+def test_tests_use_isolated_database():
+    """Ensure pytest uses temporary DB and never wipes local codereviewgraph.db."""
+    assert user_db.db_path != "codereviewgraph.db"
+    assert "test_users.db" in user_db.db_path

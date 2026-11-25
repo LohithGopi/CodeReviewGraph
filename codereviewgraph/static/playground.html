@@ -384,7 +384,9 @@ def run_system_diagnostic(user_host: str):
         setStepState('step-planner', 'done');
         setStepState('step-security', 'active');
 
-        const threadId = 'run-' + Math.random().toString(36).substring(2, 9);
+        const threadId = (window.crypto && crypto.randomUUID)
+          ? crypto.randomUUID()
+          : ('run-' + Math.random().toString(36).substring(2, 11) + Date.now().toString(36));
         const res = await fetch('/api/audit', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -427,14 +429,15 @@ def run_system_diagnostic(user_host: str):
       document.getElementById('results-container').classList.remove('hidden');
       document.getElementById('download-btn').classList.remove('hidden');
 
+      const score = report.health_score ?? report.score ?? 0;
       const scoreVal = document.getElementById('score-val');
       const statusBadge = document.getElementById('status-badge');
-      scoreVal.innerText = report.score + '/100';
+      scoreVal.innerText = score + '/100';
 
-      if (report.score >= 80) {
+      if (score >= 80) {
         statusBadge.innerText = 'PASS';
         statusBadge.className = 'px-2 py-0.5 rounded text-[10px] font-semibold uppercase bg-emerald-100 text-emerald-800';
-      } else if (report.score >= 50) {
+      } else if (score >= 50) {
         statusBadge.innerText = 'NEEDS REVIEW';
         statusBadge.className = 'px-2 py-0.5 rounded text-[10px] font-semibold uppercase bg-amber-100 text-amber-800';
       } else {
@@ -455,26 +458,37 @@ def run_system_diagnostic(user_host: str):
       } else {
         findings.forEach(f => {
           const item = document.createElement('div');
-          const isCritical = f.severity === 'critical' || f.severity === 'high';
+          const sev = String(f.severity || '').toUpperCase();
+          const isCritical = sev === 'CRITICAL' || sev === 'HIGH';
           const badgeClass = isCritical ? 'bg-rose-100 text-rose-800 border-rose-200' : 'bg-amber-100 text-amber-800 border-amber-200';
           item.className = 'p-3 rounded-xl border border-stone-200 bg-white shadow-xs space-y-1.5 text-xs';
           item.innerHTML = `
             <div class="flex items-center justify-between">
               <span class="font-semibold text-stone-900">${escapeHtml(f.title || f.category)}</span>
-              <span class="px-2 py-0.5 rounded text-[10px] font-mono uppercase border ${badgeClass}">${escapeHtml(f.severity)}</span>
+              <span class="px-2 py-0.5 rounded text-[10px] font-mono uppercase border ${badgeClass}">${escapeHtml(sev)}</span>
             </div>
             <p class="text-stone-600">${escapeHtml(f.description)}</p>
+            ${f.remediation ? `<p class="text-[11px] text-[#2d3f18]"><strong>Fix:</strong> ${escapeHtml(f.remediation)}</p>` : ''}
             ${f.line_number ? `<span class="font-mono text-[10px] text-stone-400">Line: ${f.line_number}</span>` : ''}
           `;
           list.appendChild(item);
         });
       }
 
-      latestDiff = report.diff || "";
+      const patches = report.patches || [];
+      latestDiff = patches.length
+        ? patches.map(p => `# [${p.finding_id}] ${p.explanation}\n- ${p.original_snippet}\n+ ${p.patched_snippet}`).join('\n\n')
+        : (report.diff || "");
       document.getElementById('patch-diff').innerText = latestDiff || "No patch generated.";
-      document.getElementById('ast-json').innerText = JSON.stringify(report.ast_telemetry || { status: "clean", imports: [] }, null, 2);
 
-      latestMarkdown = `# CodeReviewGraph Audit Report\n\n**Health Score:** ${report.score}/100\n**Status:** ${report.status}\n\n## Findings\n${findings.map(f => `- **[${f.severity.toUpperCase()}]** ${f.title}: ${f.description}`).join('\n')}\n\n## Unified Diff Patch\n\`\`\`diff\n${report.diff || 'No diff'}\n\`\`\``;
+      const astMetrics = report.ast_metrics || report.ast_telemetry || {};
+      document.getElementById('ast-json').innerText = JSON.stringify(astMetrics, null, 2);
+      const astStatusEl = document.getElementById('ast-status');
+      if (astStatusEl) {
+        astStatusEl.innerText = astMetrics.valid_syntax === false ? 'Syntax Error' : 'Valid AST';
+      }
+
+      latestMarkdown = report.markdown_report || `# CodeReviewGraph Audit Report\n\n**Health Score:** ${score}/100\n\n## Findings\n${findings.map(f => `- **[${String(f.severity || '').toUpperCase()}]** ${f.title}: ${f.description}`).join('\n')}\n\n## Remediation Patches\n\`\`\`diff\n${latestDiff || 'No diff'}\n\`\`\``;
     }
 
     function escapeHtml(str) {

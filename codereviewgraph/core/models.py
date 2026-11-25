@@ -1,6 +1,6 @@
 """LLM and deterministic model adapters for CodeReviewGraph."""
 import json
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional
 from langchain_core.messages import BaseMessage, AIMessage
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.outputs import ChatResult, ChatGeneration
@@ -60,14 +60,16 @@ class DeterministicCodeAuditorModel(BaseChatModel):
         return json.dumps({"status": "SUCCESS", "message": "Analysis completed."})
 
     def _extract_code(self, prompt: str) -> str:
-        """Extract code block or return full prompt."""
-        if "```" in prompt:
-            parts = prompt.split("```")
-            if len(parts) >= 3:
-                code_part = parts[1]
-                if code_part.startswith("python"):
-                    return code_part[6:].strip()
-                return code_part.strip()
+        """Extract outermost fenced code block or return full prompt."""
+        start = prompt.find("```")
+        end = prompt.rfind("```")
+        if start != -1 and end > start:
+            inner = prompt[start + 3:end]
+            if "\n" in inner:
+                first_line, rest = inner.split("\n", 1)
+                if first_line.strip().isalpha():
+                    return rest.strip()
+            return inner.strip()
         return prompt
 
     def _generate_patches(self, code: str) -> List[dict]:
@@ -103,6 +105,20 @@ class DeterministicCodeAuditorModel(BaseChatModel):
     @property
     def _llm_type(self) -> str:
         return "deterministic-code-auditor"
+
+
+def parse_llm_json(content: Any) -> Dict[str, Any]:
+    """Parse JSON from an LLM response, stripping optional markdown code fences."""
+    text = str(content).strip()
+    if text.startswith("```"):
+        lines = text.splitlines()
+        if lines and lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        text = "\n".join(lines).strip()
+    data = json.loads(text)
+    return data if isinstance(data, dict) else {}
 
 
 def get_chat_model(provider: Optional[str] = None) -> BaseChatModel:

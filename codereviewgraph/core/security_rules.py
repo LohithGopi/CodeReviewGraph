@@ -159,7 +159,7 @@ def analyze_ast(code: str) -> Dict[str, Any]:
     try:
         tree = ast.parse(code)
         for node in ast.walk(tree):
-            if isinstance(node, ast.FunctionDef):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 metrics["function_count"] += 1
                 metrics["functions"].append(node.name)
             elif isinstance(node, ast.ClassDef):

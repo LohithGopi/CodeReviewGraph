@@ -78,3 +78,35 @@ def test_deterministic_chat_model_invoke():
     response = model.invoke([HumanMessage(content=prompt)])
     assert response.content is not None
     assert "findings" in response.content
+
+
+def test_extract_code_handles_nested_backticks():
+    model = DeterministicCodeAuditorModel()
+    code_with_fences = '"""Example: ```pass```"""\neval("1+1")'
+    prompt = f"TASK: SECURITY_AUDIT\n```python\n{code_with_fences}\n```"
+    response = model.invoke([HumanMessage(content=prompt)])
+    assert "SEC-002" in response.content
+
+
+def test_parse_llm_json_strips_markdown_fences():
+    from codereviewgraph.core.models import parse_llm_json
+    fenced = '```json\n{"findings": [{"id": "X-1"}]}\n```'
+    assert parse_llm_json(fenced) == {"findings": [{"id": "X-1"}]}
+
+
+def test_analyze_ast_counts_async_functions():
+    metrics = analyze_ast("async def fetch_data():\n    return 1\n")
+    assert metrics["function_count"] == 1
+    assert "fetch_data" in metrics["functions"]
+
+
+def test_report_compiler_normalizes_lowercase_severity():
+    from codereviewgraph.graph.nodes_review import report_compiler_node
+    out = report_compiler_node({
+        "raw_code": "eval('1')",
+        "verified_findings": [{"id": "SEC-1", "title": "Eval", "severity": "critical"}],
+        "refactoring_patches": [],
+        "overall_score": 70,
+        "ast_summary": {"lines_of_code": 1, "valid_syntax": True},
+    })
+    assert out["final_report"]["critical_count"] == 1

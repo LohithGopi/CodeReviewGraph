@@ -1,8 +1,7 @@
 """Review, reflection, refactoring, and report compilation nodes for CodeReviewGraph."""
-import json
 from langchain_core.messages import HumanMessage
 from codereviewgraph.core.state import CodeReviewState, FindingSeverity
-from codereviewgraph.core.models import get_chat_model
+from codereviewgraph.core.models import get_chat_model, parse_llm_json
 
 
 def verification_critic_node(state: CodeReviewState) -> CodeReviewState:
@@ -58,20 +57,21 @@ def verification_critic_node(state: CodeReviewState) -> CodeReviewState:
 def refactoring_advisor_node(state: CodeReviewState) -> CodeReviewState:
     """Refactoring node: generates drop-in remediation patches for critical and high vulnerabilities."""
     code = state.get("raw_code", "")
+    language = state.get("language", "python")
     model = get_chat_model()
     
     prompt = (
         "TASK: GENERATE_PATCH\n"
         "Generate drop-in remediation patches for the following vulnerable code:\n"
-        f"```python\n{code}\n```"
+        f"```{language}\n{code}\n```"
     )
     
     response = model.invoke([HumanMessage(content=prompt)])
     patches = []
     
     try:
-        data = json.loads(str(response.content))
-        if isinstance(data, dict) and "patches" in data:
+        data = parse_llm_json(response.content)
+        if "patches" in data:
             patches = data["patches"]
     except Exception:
         patches = []
@@ -91,10 +91,11 @@ def report_compiler_node(state: CodeReviewState) -> CodeReviewState:
     ast_summary = state.get("ast_summary", {})
     code = state.get("raw_code", "")
     
-    crit_count = sum(1 for f in findings if f.get("severity") == FindingSeverity.CRITICAL)
-    high_count = sum(1 for f in findings if f.get("severity") == FindingSeverity.HIGH)
-    med_count = sum(1 for f in findings if f.get("severity") == FindingSeverity.MEDIUM)
-    low_count = sum(1 for f in findings if f.get("severity") in (FindingSeverity.LOW, FindingSeverity.INFO))
+    severities = [str(f.get("severity") or "").upper() for f in findings]
+    crit_count = sum(1 for s in severities if s == FindingSeverity.CRITICAL)
+    high_count = sum(1 for s in severities if s == FindingSeverity.HIGH)
+    med_count = sum(1 for s in severities if s == FindingSeverity.MEDIUM)
+    low_count = sum(1 for s in severities if s in (FindingSeverity.LOW, FindingSeverity.INFO))
     
     # Generate Markdown Report
     lines = [
