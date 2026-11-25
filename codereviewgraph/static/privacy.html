@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="google-site-verification" content="N4cEXw-VrIJLTZ4v6bZ4_ODNjIvmM1Rk7HOqOWTXIaU" />
+  <meta name="google-site-verification" content="vGChJq6PAqIH9U9jQjgympLS9HcqrjiK5-qKtXTmXbM" />
+  <meta name="google-site-verification" content="google280d8fb78c0e8560" />
+  <title>Privacy Policy — CodeReviewGraph</title>
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+  <link rel="alternate icon" type="image/png" href="/static/logo.png">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+    body { font-family: 'Plus Jakarta Sans', sans-serif; }
+    pre, code, .font-mono { font-family: 'JetBrains Mono', monospace; }
+  </style>
+</head>
+<body class="bg-[#fafaf9] text-[#1c1d1a] min-h-screen flex flex-col justify-between antialiased selection:bg-[#a8c242]/30">
+
+  <!-- Top Minimal Header -->
+  <header class="border-b border-stone-200/80 bg-white/80 backdrop-blur-md sticky top-0 z-40">
+    <div class="max-w-4xl mx-auto px-6 h-16 flex items-center justify-between">
+      <a href="/" class="flex items-center space-x-2.5 group">
+        <img src="/static/logo.svg" onerror="this.src='/static/logo.png'" alt="CodeReviewGraph Logo" class="w-7 h-7 rounded-lg object-contain shadow-xs group-hover:scale-105 transition-transform">
+        <span class="text-sm font-semibold tracking-tight text-[#1c1d1a] group-hover:text-[#2d3f18] transition-colors">codereviewgraph</span>
+      </a>
+      <nav class="flex items-center space-x-5 text-xs font-medium text-stone-500">
+        <a href="/privacy" class="text-[#2d3f18] font-semibold">Privacy Policy</a>
+        <a href="/terms" class="hover:text-stone-900 transition">Terms of Service</a>
+        <a href="/login" class="px-3.5 py-1.5 rounded-full bg-[#2d3f18] hover:bg-[#202e11] text-[#f7f9f0] font-semibold transition">Sign In</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="flex-1 max-w-4xl mx-auto w-full px-6 py-12">
+    <div class="bg-white rounded-3xl border border-stone-200/90 shadow-sm p-7 sm:p-12 space-y-8">
+
+      <!-- Document Header -->
+      <div class="space-y-3 border-b border-stone-200 pb-6">
+        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#f4f7ea] border border-[#d6e3a8] text-[11px] font-mono font-medium text-[#2d3f18]">
+          <span>Effective Date: November 25, 2026</span>
+        </div>
+        <h1 class="text-3xl sm:text-4xl font-bold tracking-tight text-[#1c1d1a]">Privacy Policy</h1>
+        <p class="text-sm text-stone-600 leading-relaxed">
+          This Privacy Policy explains how <strong>CodeReviewGraph</strong> collects, uses, stores, and protects information when you use our website, authentication services, API, and multi-agent code auditing workstation.
+        </p>
+      </div>
+
+      <!-- Sections -->
+      <div class="space-y-7 text-sm text-stone-700 leading-relaxed">
+
+        <section class="space-y-2.5">
+          <h2 class="text-lg font-bold text-[#1c1d1a]">1. Information We Collect</h2>
+          <p>We collect only the minimum information necessary to authenticate your account, secure your session, and run automated code reviews:</p>
+          <ul class="list-disc pl-5 space-y-1.5 text-stone-600">
+            <li><strong>Google Account Information (via Google OAuth 2.0):</strong> When you sign in with Google, we request only standard identity scopes (<code class="text-xs bg-stone-100 px-1.5 py-0.5 rounded">openid</code>, <code class="text-xs bg-stone-100 px-1.5 py-0.5 rounded">email</code>, <code class="text-xs bg-stone-100 px-1.5 py-0.5 rounded">profile</code>). We store your Google subject identifier (<code class="text-xs bg-stone-100 px-1.5 py-0.5 rounded">sub</code>), verified email address, display name, profile picture URL, and login timestamps.</li>
+            <li><strong>Email &amp; One-Time Passcode (OTP) Authentication:</strong> When you sign in with email OTP, we collect your name and email address to generate a temporary 6-digit verification code and create your account record.</li>
+            <li><strong>Session &amp; Technical Metadata:</strong> To maintain secure sessions and defend against unauthorized access or CSRF attacks, we store a random session token along with basic request metadata (such as User-Agent and IP address) and single-use OAuth state tokens.</li>
+            <li><strong>Submitted Source Code:</strong> When you execute an audit in the playground or via <code class="text-xs bg-stone-100 px-1.5 py-0.5 rounded">POST /api/audit</code>, the source code snippet is analyzed in memory by the LangGraph workflow to generate findings and refactoring diffs.</li>
+          </ul>
+        </section>
+
+        <section class="space-y-2.5">
+          <h2 class="text-lg font-bold text-[#1c1d1a]">2. How We Use Your Information</h2>
+          <ul class="list-disc pl-5 space-y-1.5 text-stone-600">
+            <li>Verify your identity and prevent duplicate accounts or unauthorized account linking.</li>
+            <li>Maintain an authenticated, HTTP-only browser session across the CodeReviewGraph workstation.</li>
+            <li>Display your profile name, email, and avatar inside the authenticated workspace.</li>
+            <li>Run deterministic AST parsing, security rule checks, and optional LLM-assisted code reviews upon your explicit request.</li>
+            <li>Protect our endpoints against abuse, brute-force OTP attempts, and replay attacks.</li>
+          </ul>
+        </section>
+
+        <section class="space-y-2.5 p-4 rounded-2xl bg-[#f4f7ea]/70 border border-[#d6e3a8]">
+          <h2 class="text-base font-bold text-[#2d3f18]">3. Google API Services User Data Policy Compliance</h2>
+          <p class="text-xs sm:text-sm text-[#2d3f18]/90">
+            CodeReviewGraph’s use and transfer of information received from Google APIs strictly adheres to the
+            <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener noreferrer" class="underline font-semibold hover:text-[#1c1d1a]">Google API Services User Data Policy</a>,
+            including the Limited Use requirements. We do not access your Google Drive, Gmail, Calendar, or Contacts, we do not sell your Google user data, and we do not use Google user data for advertising or third-party AI model training.
+          </p>
+        </section>
+
+        <section class="space-y-2.5">
+          <h2 class="text-lg font-bold text-[#1c1d1a]">4. Data Storage, Security &amp; Retention</h2>
+          <ul class="list-disc pl-5 space-y-1.5 text-stone-600">
+            <li><strong>Cookies &amp; Token Handling:</strong> Authentication sessions use an HTTP-only, <code class="text-xs bg-stone-100 px-1.5 py-0.5 rounded">SameSite=Lax</code> cookie (<code class="text-xs bg-stone-100 px-1.5 py-0.5 rounded">crg_session</code>) with <code class="text-xs bg-stone-100 px-1.5 py-0.5 rounded">Secure</code> enforced over HTTPS. Sensitive credentials and tokens are never stored in browser <code class="text-xs bg-stone-100 px-1.5 py-0.5 rounded">localStorage</code>.</li>
+            <li><strong>Retention Periods:</strong> Email OTP codes expire automatically after 10 minutes (or immediately upon use or 5 failed verification attempts). OAuth CSRF state tokens expire after 10 minutes. Active login sessions expire after 7 days unless terminated earlier when you click <strong>Sign Out</strong>.</li>
+            <li><strong>Code Audit Checkpoints:</strong> Workflow execution states are maintained in a bounded in-memory store (up to recent threads) and are not sold or shared with third parties. If Gemini LLM mode is enabled by your deployment operator, submitted snippets are sent to Google Gemini solely to produce your requested code review.</li>
+          </ul>
+        </section>
+
+        <section class="space-y-2.5">
+          <h2 class="text-lg font-bold text-[#1c1d1a]">5. Sharing &amp; Third-Party Services</h2>
+          <p>We do not sell, rent, or trade your personal information. Data is only transmitted to infrastructure providers required to operate authentication and hosting (Google Identity Services / OAuth 2.0 for Google sign-in, your configured SMTP provider for OTP emails, and Vercel for application hosting).</p>
+        </section>
+
+        <section class="space-y-2.5">
+          <h2 class="text-lg font-bold text-[#1c1d1a]">6. Your Rights &amp; Data Deletion</h2>
+          <p>You may terminate your active session at any time by clicking <strong>Sign Out</strong>, which deletes your session record from our database and clears your session cookie. You may also revoke CodeReviewGraph’s access from your <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener noreferrer" class="underline text-[#2d3f18] font-medium">Google Account Permissions</a> page. To request deletion of your stored profile record, contact the project maintainer using the details below.</p>
+        </section>
+
+        <section class="space-y-2.5">
+          <h2 class="text-lg font-bold text-[#1c1d1a]">7. Contact Us</h2>
+          <p>
+            If you have questions about this Privacy Policy or wish to exercise your data rights, please open an issue or reach out via our repository at
+            <a href="https://github.com/LohithGopi/CodeReviewGraph" target="_blank" rel="noopener noreferrer" class="underline text-[#2d3f18] font-medium">github.com/LohithGopi/CodeReviewGraph</a>.
+          </p>
+        </section>
+
+      </div>
+
+    </div>
+  </main>
+
+  <!-- Minimal Footer -->
+  <footer class="w-full max-w-4xl mx-auto px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-stone-500 border-t border-stone-200/70">
+    <span>&copy; 2026 CodeReviewGraph &bull; Stateful Multi-Agent Governance</span>
+    <div class="flex items-center space-x-4">
+      <a href="/" class="hover:text-stone-900 transition">Home</a>
+      <span>&bull;</span>
+      <a href="/privacy" class="text-stone-900 font-medium">Privacy Policy</a>
+      <span>&bull;</span>
+      <a href="/terms" class="hover:text-stone-900 transition">Terms of Service</a>
+    </div>
+  </footer>
+
+</body>
+</html>

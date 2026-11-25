@@ -22,7 +22,39 @@ FALLBACK_HTML = """<!DOCTYPE html>
 <body style="font-family:sans-serif;padding:2rem;text-align:center;">
   <h1>CodeReviewGraph</h1>
   <p>Multi-Agent Code Review & Governance Pipeline.</p>
-  <p><a href="/login">Sign In</a> | <a href="/docs">API Documentation</a></p>
+  <p><a href="/login">Sign In</a> | <a href="/docs">API Documentation</a> | <a href="/privacy">Privacy Policy</a> | <a href="/terms">Terms of Service</a></p>
+</body>
+</html>"""
+
+FALLBACK_PRIVACY_HTML = """<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="google-site-verification" content="N4cEXw-VrIJLTZ4v6bZ4_ODNjIvmM1Rk7HOqOWTXIaU" />
+  <meta name="google-site-verification" content="vGChJq6PAqIH9U9jQjgympLS9HcqrjiK5-qKtXTmXbM" />
+  <title>Privacy Policy — CodeReviewGraph</title>
+</head>
+<body style="font-family:sans-serif;max-width:720px;margin:2rem auto;padding:0 1rem;line-height:1.6;">
+  <h1>Privacy Policy — CodeReviewGraph</h1>
+  <p>CodeReviewGraph collects only basic account identity details (name, verified email address, and Google profile identifier/avatar when signing in with Google) to authenticate sessions via HTTP-only cookies and execute requested code reviews.</p>
+  <p><a href="/">Home</a> | <a href="/terms">Terms of Service</a></p>
+</body>
+</html>"""
+
+FALLBACK_TERMS_HTML = """<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="google-site-verification" content="N4cEXw-VrIJLTZ4v6bZ4_ODNjIvmM1Rk7HOqOWTXIaU" />
+  <meta name="google-site-verification" content="vGChJq6PAqIH9U9jQjgympLS9HcqrjiK5-qKtXTmXbM" />
+  <title>Terms of Service — CodeReviewGraph</title>
+</head>
+<body style="font-family:sans-serif;max-width:720px;margin:2rem auto;padding:0 1rem;line-height:1.6;">
+  <h1>Terms of Service — CodeReviewGraph</h1>
+  <p>CodeReviewGraph provides automated multi-agent code auditing and refactoring suggestions on an AS IS basis. You retain ownership of all submitted source code.</p>
+  <p><a href="/">Home</a> | <a href="/privacy">Privacy Policy</a></p>
 </body>
 </html>"""
 
@@ -71,37 +103,46 @@ app.add_middleware(
 app.include_router(router)
 
 
+def _serve_static_html(filename: str, fallback_html: str) -> Response:
+    """Serve an HTML asset from static/public paths with inline fallback."""
+    target = find_static_file(filename)
+    if target and target.is_file():
+        return FileResponse(target)
+    return Response(content=fallback_html, media_type="text/html")
+
+
 @app.get("/", include_in_schema=False)
 def serve_dashboard():
     """Serve the interactive web frontend dashboard."""
-    index_file = find_static_file("index.html")
-    if index_file and index_file.is_file():
-        return FileResponse(index_file)
-    return Response(content=FALLBACK_HTML, media_type="text/html")
+    return _serve_static_html("index.html", FALLBACK_HTML)
 
 
 @app.get("/login", include_in_schema=False)
 def serve_login():
     """Serve the dedicated login authentication page."""
-    login_file = find_static_file("login.html")
-    if login_file and login_file.is_file():
-        return FileResponse(login_file)
-    index_file = find_static_file("index.html")
-    if index_file and index_file.is_file():
-        return FileResponse(index_file)
-    return Response(content=FALLBACK_HTML, media_type="text/html")
+    return _serve_static_html("login.html", FALLBACK_HTML)
 
 
 @app.get("/playground", include_in_schema=False)
 def serve_playground():
     """Serve the dedicated live code playground workstation."""
-    playground_file = find_static_file("playground.html")
-    if playground_file and playground_file.is_file():
-        return FileResponse(playground_file)
-    index_file = find_static_file("index.html")
-    if index_file and index_file.is_file():
-        return FileResponse(index_file)
-    return Response(content=FALLBACK_HTML, media_type="text/html")
+    return _serve_static_html("playground.html", FALLBACK_HTML)
+
+
+@app.get("/privacy", include_in_schema=False)
+@app.get("/privacy-policy", include_in_schema=False)
+@app.get("/privacy.html", include_in_schema=False)
+def serve_privacy_policy():
+    """Serve the public Application Privacy Policy page."""
+    return _serve_static_html("privacy.html", FALLBACK_PRIVACY_HTML)
+
+
+@app.get("/terms", include_in_schema=False)
+@app.get("/terms-of-service", include_in_schema=False)
+@app.get("/terms.html", include_in_schema=False)
+def serve_terms_of_service():
+    """Serve the public Application Terms of Service page."""
+    return _serve_static_html("terms.html", FALLBACK_TERMS_HTML)
 
 
 

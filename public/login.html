@@ -136,14 +136,27 @@
           </p>
         </div>
 
+        <!-- Legal Agreement Line -->
+        <p class="text-[11px] text-center text-stone-500 pt-1">
+          By signing in, you agree to our
+          <a href="/terms" class="text-[#2d3f18] font-medium underline underline-offset-2 hover:text-[#1c1d1a]">Terms of Service</a>
+          and
+          <a href="/privacy" class="text-[#2d3f18] font-medium underline underline-offset-2 hover:text-[#1c1d1a]">Privacy Policy</a>.
+        </p>
+
       </div>
 
     </div>
   </main>
 
   <!-- Minimal Footer -->
-  <footer class="w-full max-w-5xl mx-auto px-6 py-6 text-center text-xs text-stone-400">
-    &copy; 2026 CodeReviewGraph &bull; Stateful Multi-Agent Governance
+  <footer class="w-full max-w-5xl mx-auto px-6 py-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-stone-400">
+    <span>&copy; 2026 CodeReviewGraph &bull; Stateful Multi-Agent Governance</span>
+    <div class="flex items-center space-x-3">
+      <a href="/privacy" class="hover:text-stone-700 transition">Privacy Policy</a>
+      <span>&bull;</span>
+      <a href="/terms" class="hover:text-stone-700 transition">Terms of Service</a>
+    </div>
   </footer>
 
   <!-- Notification Toast Container -->

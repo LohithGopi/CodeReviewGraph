@@ -144,6 +144,32 @@ def test_homepage_has_verification_meta_tag():
     assert response.status_code == 200
     assert "vGChJq6PAqIH9U9jQjgympLS9HcqrjiK5-qKtXTmXbM" in response.text
     assert "N4cEXw-VrIJLTZ4v6bZ4_ODNjIvmM1Rk7HOqOWTXIaU" in response.text
+    assert 'href="/privacy"' in response.text
+    assert 'href="/terms"' in response.text
+
+
+def test_privacy_policy_routes():
+    for path in ("/privacy", "/privacy-policy", "/privacy.html"):
+        response = client.get(path)
+        assert response.status_code == 200
+        assert "Privacy Policy" in response.text
+        assert "Google API Services User Data Policy" in response.text
+
+
+def test_terms_of_service_routes():
+    for path in ("/terms", "/terms-of-service", "/terms.html"):
+        response = client.get(path)
+        assert response.status_code == 200
+        assert "Terms of Service" in response.text
+        assert 'href="/privacy"' in response.text
+
+
+def test_login_and_playground_include_legal_links():
+    for path in ("/login", "/playground"):
+        response = client.get(path)
+        assert response.status_code == 200
+        assert 'href="/privacy"' in response.text
+        assert 'href="/terms"' in response.text
 
 
 
